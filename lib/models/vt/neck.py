@@ -96,12 +96,12 @@ class NECK_MAXF(nn.Module):
 
     def forward(self, xz_list):
         cls = xz_list[-1][:,0:1,:].permute(1,0,2)
-        x = xz_list[0][:, 0:self.num_x * (4 ** (len(xz_list) - 1 )), :]
-        B, N, C = x.shape
-        Len = int(N ** 0.5)
-        x = x.permute(0, 2, 1).view(B, C, Len, Len)
-        B, C, Len, _ = x.shape
-        x = x.view(B,C,Len*Len).permute(2, 0, 1)
+        x = xz_list[0][:, 0:self.num_x * (4 ** (len(xz_list) - 1 )), :].permute(1,0,2)
+        # B, N, C = x.shape
+        # Len = int(N ** 0.5)
+        # x = x.permute(0, 2, 1).view(B, C, Len, Len)
+        # B, C, Len, _ = x.shape
+        # x = x.view(B,C,Len*Len).permute(2, 0, 1)
         x = self.proj1(x)
         cls = self.proj2(cls)
         xz = torch.cat((cls, x), dim=0)
