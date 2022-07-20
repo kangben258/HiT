@@ -1,0 +1,5 @@
+[train: 1, 50 / 15000] FPS: 21.4 (26.1)  ,  Loss/total: 2.22589  ,  Loss/giou: 0.68612  ,  Loss/l1: 0.17073  ,  IoU: 0.07675
+[train: 1, 100 / 15000] FPS: 23.1 (28.8)  ,  Loss/total: 2.25251  ,  Loss/giou: 0.72642  ,  Loss/l1: 0.15993  ,  IoU: 0.12216
+[train: 1, 50 / 15000] FPS: 20.0 (18.6)  ,  Loss/total: 3.45481  ,  Loss/giou: 1.17875  ,  Loss/l1: 0.21946  ,  IoU: 0.04043
+[train: 1, 100 / 15000] FPS: 21.9 (49.9)  ,  Loss/total: 3.39867  ,  Loss/giou: 1.15109  ,  Loss/l1: 0.21930  ,  IoU: 0.07050
+[train: 1, 150 / 15000] FPS: 22.4 (23.3)  ,  Loss/total: 3.37743  ,  Loss/giou: 1.14006  ,  Loss/l1: 0.21946  ,  IoU: 0.07761
