@@ -29,6 +29,7 @@ class VT(nn.Module):
         self.num_patch_x = self.backbone.body.num_patches_search
         self.num_patch_z = self.backbone.body.num_patches_template
         self.neck_type = neck_type
+
         if neck_type in ['UPSAMPLE', 'FPN','MAXF','MAXMINF']:
             self.num_patch_x = self.backbone.body.num_patches_search * ((bottleneck.stride_total) ** 2)#这个是干嘛
         self.side_fx = int(math.sqrt(self.num_patch_x))
@@ -104,8 +105,6 @@ class VT(nn.Module):
             outputs_coord_new = outputs_coord.view(bs, 1, 4)
             out = {'pred_boxes': outputs_coord_new}
             return out, outputs_coord_new
-
-
         elif self.head_type == "MLP":
             # Forward the class and box head
             outputs_coord = self.box_head(hs).sigmoid()

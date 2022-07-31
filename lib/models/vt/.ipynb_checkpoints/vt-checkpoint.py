@@ -29,6 +29,7 @@ class VT(nn.Module):
         self.num_patch_x = self.backbone.body.num_patches_search
         self.num_patch_z = self.backbone.body.num_patches_template
         self.neck_type = neck_type
+
         if neck_type in ['UPSAMPLE', 'FPN','MAXF','MAXMINF']:
             self.num_patch_x = self.backbone.body.num_patches_search * ((bottleneck.stride_total) ** 2)#这个是干嘛
         self.side_fx = int(math.sqrt(self.num_patch_x))
@@ -81,7 +82,7 @@ class VT(nn.Module):
         """
         hs: output embeddings (1, B, N, C)
         memory: encoder embeddings (HW1+HW2, B, C)"""
-        if "CORNER" in self.head_type:
+        if "CORNER" in self.head_type and self.head_type != "CORNER_WOATT":
             # adjust shape
             enc_opt = memory[-self.feat_len_s:].transpose(0, 1)  # encoder output for the search region (B, HW, C)
             dec_opt = hs.squeeze(0).transpose(1, 2)  # (B, C, N)
@@ -93,6 +94,15 @@ class VT(nn.Module):
             # run the corner head
             outputs_coord = box_xyxy_to_cxcywh(self.box_head(opt_feat))
             outputs_coord_new = outputs_coord.view(bs, Nq, 4)
+            out = {'pred_boxes': outputs_coord_new}
+            return out, outputs_coord_new
+        elif self.head_type == "CORNER_WOATT":
+            enc_opt = memory[-self.feat_len_s:].transpose(0, 1).permute(0,2,1)#(B,C,HW)
+            bs, C, HW = enc_opt.size()
+            opt_feat = enc_opt.view(-1,C, self.feat_sz_s, self.feat_sz_s)
+            # run the corner head
+            outputs_coord = box_xyxy_to_cxcywh(self.box_head(opt_feat))
+            outputs_coord_new = outputs_coord.view(bs, 1, 4)
             out = {'pred_boxes': outputs_coord_new}
             return out, outputs_coord_new
         elif self.head_type == "MLP":
