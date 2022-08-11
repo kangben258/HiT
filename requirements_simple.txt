@@ -1,0 +1,15 @@
+PyYAML
+easydict
+cython
+pandas
+tqdm
+pycocotools
+jpeg4py
+tb-nightly
+tikzplotlib
+colorama
+lmdb
+scipy
+visdom
+timm == 0.5.4
+yacs
