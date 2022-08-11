@@ -104,8 +104,6 @@ class VT(nn.Module):
             outputs_coord_new = outputs_coord.view(bs, 1, 4)
             out = {'pred_boxes': outputs_coord_new}
             return out, outputs_coord_new
-
-
         elif self.head_type == "MLP":
             # Forward the class and box head
             outputs_coord = self.box_head(hs).sigmoid()

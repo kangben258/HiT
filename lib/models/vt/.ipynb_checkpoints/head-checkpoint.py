@@ -547,8 +547,7 @@ def build_box_head(cfg):
         return mlp_head
     elif "CORNER" in cfg.MODEL.HEAD_TYPE:
         stride = cfg.MODEL.BACKBONE.STRIDE
-
-        if cfg.MODEL.NECK.TYPE in ["UPSAMPLE", "FPN","MAXF","MAXMINF"]:
+        if cfg.MODEL.NECK.TYPE in ["UPSAMPLE", "FPN","MAXF","MAXMINF","MAXMIDF","MINMIDF"]:
             stride = stride // (cfg.MODEL.NECK.NUM_LAYERS * cfg.MODEL.NECK.STRIDE)
         feat_sz = int(cfg.DATA.SEARCH.SIZE / stride)
         channel = getattr(cfg.MODEL, "HEAD_DIM", 256)

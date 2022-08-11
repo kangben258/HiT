@@ -1,5 +1,6 @@
 class EnvironmentSettings:
     def __init__(self):
+
         self.workspace_dir = '/root/EdgeTrack-master'    # Base directory for saving network checkpoints.
         self.tensorboard_dir = '/root/EdgeTrack-master/tensorboard'    # Directory for tensorboard files.
         self.pretrained_networks = 'EdgeTrack-master/pretrained_networks'

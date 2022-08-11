@@ -273,7 +273,6 @@ class Attention(torch.nn.Module):
         self.register_buffer('attention_bias_idxs',
                              torch.LongTensor(idxs_xz).view(N_xz, N_xz))
 
-        #w为什么要这样操作是为了减少计算量吗
 
 
         # N_xz = resolution_x**2 + (resolution_z**2)*template_number
