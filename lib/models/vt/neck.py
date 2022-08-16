@@ -11,13 +11,13 @@ class NECK_UPSAMPLE(nn.Module):
         h = [hidden_dim] * (num_layers - 1)
         st = [stride] * (num_layers)
         if BN:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)), nn.BatchNorm2d(k))
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)), nn.BatchNorm2d(k))
                                         for n, k,s in zip([input_dim] + h, h + [hidden_dim], st))
         else:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)))
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)))
                                         for n, k,s in zip([input_dim] + h, h + [hidden_dim], st))
         self.proj = nn.Linear(hidden_dim, output_dim)
-        self.stride_total = stride * num_layers
+        self.stride_total = stride ** num_layers
 
     def forward(self, xz):
         cls = xz[0:1,:,:]
@@ -42,16 +42,16 @@ class NECK_FPN(nn.Module):
         # h = [hidden_dim] * (num_layers - 1)
         st = [stride] * (num_layers)
         if BN:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
                                         for n, k,s in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:], st))
         else:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)))
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)))
                                         for n, k,s in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:], st))
         # self.adapters = nn.ModuleList(nn.Sequential(nn.Conv2d(n, k, (1,1)))
         #                                 for n, k in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:]))
         self.proj1 = nn.Linear(self.backbone_embed_dim[0], output_dim)
         self.proj2 = nn.Linear(hidden_dim, output_dim)
-        self.stride_total = stride * num_layers
+        self.stride_total = stride ** num_layers
 
     def forward(self, xz_list):
         cls = xz_list[-1][:,0:1,:].permute(1,0,2)
@@ -92,7 +92,7 @@ class NECK_MAXF(nn.Module):
         self.num_layers = num_layers
         self.proj1 = nn.Linear(self.backbone_embed_dim[0], output_dim)
         self.proj2 = nn.Linear(hidden_dim, output_dim)
-        self.stride_total = stride * num_layers
+        self.stride_total = stride ** num_layers
 
     def forward(self, xz_list):
         cls = xz_list[-1][:,0:1,:].permute(1,0,2)
@@ -117,16 +117,16 @@ class NECK_MAXMINF(nn.Module):
         # h = [hidden_dim] * (num_layers - 1)
         st = [stride] * (num_layers)
         if BN:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
                                         for n, k,s in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:], st))
         else:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)))
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)))
                                         for n, k,s in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:], st))
         # self.adapters = nn.ModuleList(nn.Sequential(nn.Conv2d(n, k, (1,1)))
         #                                 for n, k in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:]))
         self.proj1 = nn.Linear(self.backbone_embed_dim[0], output_dim)
         self.proj2 = nn.Linear(hidden_dim, output_dim)
-        self.stride_total = stride * num_layers
+        self.stride_total = stride ** num_layers
 
     def forward(self, xz_list):
         cls = xz_list[-1][:,0:1,:].permute(1,0,2)
@@ -172,16 +172,16 @@ class NECK_MAXMIDF(nn.Module):
         k = backbone_embed_dim[0]
         s = st[0]
         if BN:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
                                         )
         else:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)))
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)))
                                         )
         # self.adapters = nn.ModuleList(nn.Sequential(nn.Conv2d(n, k, (1,1)))
         #                                 for n, k in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:]))
         self.proj1 = nn.Linear(self.backbone_embed_dim[0], output_dim)
         self.proj2 = nn.Linear(hidden_dim, output_dim)
-        self.stride_total = stride * num_layers
+        self.stride_total = stride ** num_layers
 
     def forward(self, xz_list):
         cls = xz_list[-1][:,0:1,:].permute(1,0,2)
@@ -216,16 +216,16 @@ class NECK_MINMIDF(nn.Module):
         # h = [hidden_dim] * (num_layers - 1)
         st = [stride] * (num_layers)
         if BN:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)), nn.BatchNorm2d(k))#convtransposed上采样
                                         for n, k,s in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:], st))
         else:
-            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (2,2), (s,s)))
+            self.layers = nn.ModuleList(nn.Sequential(nn.ConvTranspose2d(n, k, (s,s), (s,s)))
                                         for n, k,s in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:], st))
         # self.adapters = nn.ModuleList(nn.Sequential(nn.Conv2d(n, k, (1,1)))
         #                                 for n, k in zip(backbone_embed_dim[::-1][0:-1], backbone_embed_dim[::-1][1:]))
         self.proj1 = nn.Linear(self.backbone_embed_dim[0], output_dim)
         self.proj2 = nn.Linear(hidden_dim, output_dim)
-        self.stride_total = stride * num_layers
+        self.stride_total = stride ** num_layers
 
     def forward(self, xz_list):
         cls = xz_list[-1][:,0:1,:].permute(1,0,2)
