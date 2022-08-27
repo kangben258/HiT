@@ -272,9 +272,6 @@ class Attention(torch.nn.Module):
             torch.zeros(num_heads, len(attention_offsets_xz)))
         self.register_buffer('attention_bias_idxs',
                              torch.LongTensor(idxs_xz).view(N_xz, N_xz))
-
-
-
         # N_xz = resolution_x**2 + (resolution_z**2)*template_number
         # idxs_xz = []
         # for i in range(N_xz):
@@ -554,8 +551,7 @@ class LeViT(torch.nn.Module):
         if distillation:
             self.head_dist = BN_Linear(
                 embed_dim[-1], num_classes) if num_classes > 0 else torch.nn.Identity()
-
-        if self.neck_type == 'FPN' or self.neck_type == 'MAXF' or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF":
+        if self.neck_type == 'FPN' or self.neck_type == 'MAXF' or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
             fpn_idx = []
             for i in range(len(self.blocks)):
                 if self.blocks[i]._get_name() == 'AttentionSubsample':
@@ -581,7 +577,7 @@ class LeViT(torch.nn.Module):
                 xz = x
             else:
                 xz = torch.cat((xz, x), dim=1)
-        if self.neck_type == 'FPN' or self.neck_type == "MAXF" or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF":
+        if self.neck_type == 'FPN' or self.neck_type == "MAXF" or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
             assert len(self.fpn_idx) == 2
             xz1 = self.blocks[0:self.fpn_idx[0]](xz)
             xz2 = self.blocks[self.fpn_idx[0]:self.fpn_idx[1]](xz1)

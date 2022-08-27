@@ -258,6 +258,7 @@ class NECK_MINMIDF(nn.Module):
         xz = torch.cat((cls, x), dim=0)
         return xz
 
+
 class NECK_MIDF(nn.Module):
 
     def __init__(self, num_x, input_dim, hidden_dim, output_dim, stride, num_layers, backbone_embed_dim, BN=False):

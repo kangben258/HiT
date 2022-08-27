@@ -29,7 +29,7 @@ class VT(nn.Module):
         self.num_patch_x = self.backbone.body.num_patches_search
         self.num_patch_z = self.backbone.body.num_patches_template
         self.neck_type = neck_type
-        if neck_type in ['UPSAMPLE', 'FPN','MAXF','MAXMINF','MAXMIDF','MINMIDF']:
+        if neck_type in ['UPSAMPLE', 'FPN','MAXF','MAXMINF','MAXMIDF','MINMIDF','MIDF']:
             self.num_patch_x = self.backbone.body.num_patches_search * ((bottleneck.stride_total) ** 2)#这个是干嘛
         self.side_fx = int(math.sqrt(self.num_patch_x))
         self.side_fz = int(math.sqrt(self.num_patch_z))
@@ -66,7 +66,7 @@ class VT(nn.Module):
         if self.aux_loss:
             raise ValueError("Deep supervision is not supported.")
         # Forward the transformer encoder and decoder
-        if self.neck_type == 'FPN' or self.neck_type == "MAXF" or self.neck_type == 'MAXMINF' or self.neck_type == "MAXMIDF" or self.neck_type == 'MINMIDF':
+        if self.neck_type == 'FPN' or self.neck_type == "MAXF" or self.neck_type == 'MAXMINF' or self.neck_type == "MAXMIDF" or self.neck_type == 'MINMIDF' or self.neck_type == "MIDF":
             xz_mem = self.bottleneck(xz)
         else:
             xz_mem = xz[-1].permute(1, 0, 2)

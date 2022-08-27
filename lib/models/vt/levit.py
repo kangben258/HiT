@@ -272,10 +272,6 @@ class Attention(torch.nn.Module):
             torch.zeros(num_heads, len(attention_offsets_xz)))
         self.register_buffer('attention_bias_idxs',
                              torch.LongTensor(idxs_xz).view(N_xz, N_xz))
-
-        #w为什么要这样操作是为了减少计算量吗
-
-
         # N_xz = resolution_x**2 + (resolution_z**2)*template_number
         # idxs_xz = []
         # for i in range(N_xz):
@@ -555,7 +551,6 @@ class LeViT(torch.nn.Module):
         if distillation:
             self.head_dist = BN_Linear(
                 embed_dim[-1], num_classes) if num_classes > 0 else torch.nn.Identity()
-
         if self.neck_type == 'FPN' or self.neck_type == 'MAXF' or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
             fpn_idx = []
             for i in range(len(self.blocks)):
