@@ -12,6 +12,7 @@ from lib.utils.misc import is_main_process
 from lib.models.stark import resnet as resnet_module
 from lib.models.stark.repvgg import get_RepVGG_func_by_name
 from lib.models.vt import levit as levit_module
+from lib.models.vt import tinyvit_split as tinyvit_module
 # from lib.models.vt import levit_ori as levit_module
 import os
 
@@ -154,6 +155,18 @@ class Backbone(BackboneBase):
         elif "vit" in name.lower():
             # norm_layer = FrozenBatchNorm2d if freeze_bn else nn.BatchNorm2d
             # todo: frozenlayernorm
+            if "tiny_vit" in name:
+                backbone = getattr(tinyvit_module,name)(
+                    num_classes=0,
+                    pretrained=is_main_process(),
+                    search_size=search_size,
+                    template_size=template_size,
+                    template_number=template_number,
+                    neck_type=neck_type
+                )
+                num_channels = 576
+                net_type = "tiny_vit"
+
             if "LeViT" in name:
                 # fuse == False when training
                 backbone = getattr(levit_module, name)(
