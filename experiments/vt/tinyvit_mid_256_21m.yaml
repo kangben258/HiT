@@ -42,7 +42,7 @@ MODEL:
     DILATION: false
     OUTPUT_LAYERS:
     - layer12
-    TYPE: TinyViT_21m
+    TYPE: tiny_vit_21m_224
     PRETRAIN_TYPE: default
     STRIDE: 32
   NECK:
