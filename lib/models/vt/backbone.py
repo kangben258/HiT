@@ -12,7 +12,8 @@ from lib.utils.misc import is_main_process
 from lib.models.stark import resnet as resnet_module
 from lib.models.stark.repvgg import get_RepVGG_func_by_name
 from lib.models.vt import levit as levit_module
-from lib.models.vt import tinyvit_split as tinyvit_module
+from lib.models.vt import tinyvit_split as tinyvit_module #if use split
+#from lib.models.vt import tinyvit_global as tinyvit_module #if use global
 # from lib.models.vt import levit_ori as levit_module
 import os
 
