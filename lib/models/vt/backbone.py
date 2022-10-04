@@ -12,8 +12,12 @@ from lib.utils.misc import is_main_process
 from lib.models.stark import resnet as resnet_module
 from lib.models.stark.repvgg import get_RepVGG_func_by_name
 from lib.models.vt import levit as levit_module
-from lib.models.vt import tinyvit_split as tinyvit_module #if use split
-#from lib.models.vt import tinyvit_global as tinyvit_module #if use global
+from lib.models.vt import tinyvit_global as tinyvit_module  #if use global
+from lib.models.vt import mobilevit_cat as mobilevit_module
+from lib.models.vt import pvt as pvt_module
+# from lib.models.vt.mobilevit.options.opts import get_training_arguments
+# from lib.models.vt.mobilevit.cvnets.models.classification import build_classification_model
+# from lib.models.vt import tinyvit_split as tinyvit_module   #if ust split
 # from lib.models.vt import levit_ori as levit_module
 import os
 
@@ -167,6 +171,24 @@ class Backbone(BackboneBase):
                 )
                 num_channels = 576
                 net_type = "tiny_vit"
+
+            if "mobilevit" in name:
+                backbone = getattr(mobilevit_module,name)(
+                    pretrained=is_main_process(),num_classes=0,
+                    search_size=search_size,template_size=template_size,
+                    template_number=template_number,neck_type=neck_type
+                )
+                num_channels = 640  #output channel
+                net_type = "mobilevit"
+
+            if "pvit" in name:
+                backbone = getattr(pvt_module,name)(
+                    pretrained=is_main_process(),
+                    search_size=search_size,template_size=template_size,
+                    template_number=template_number,neck_type=neck_type
+                )
+                num_channels = 512
+                net_type = "pvit"
 
             if "LeViT" in name:
                 # fuse == False when training
