@@ -289,9 +289,9 @@ def _conv_filter(state_dict, patch_size=16):
     return out_dict
 
 
-def load_pretrained(model):
+def load_pretrained(model,url):
 
-    url = "https://github.com/whai362/PVT/releases/download/v2/pvt_large.pth"
+
     checkpoint = torch.hub.load_state_dict_from_url(
         url=url,
         map_location='cpu', check_hash=False,
@@ -322,7 +322,7 @@ def pvit_tiny(pretrained=True,search_size=256,template_size=128,
 
 
 @register_model
-def pvt_small(pretrained=False,search_size=256,template_size=128,
+def pvit_small(pretrained=False,search_size=256,template_size=128,
               template_number=1,neck_type="FPN", **kwargs):
     model = PyramidVisionTransformer(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
@@ -330,6 +330,9 @@ def pvt_small(pretrained=False,search_size=256,template_size=128,
         search_size=search_size, template_size=template_size, template_number=template_number, neck_type=neck_type,
         **kwargs)
     # model.default_cfg = _cfg()
+    if pretrained:
+        weight = "https://github.com/whai362/PVT/releases/download/v2/pvt_small.pth"
+        load_pretrained(model,weight)
 
     return model
 
@@ -355,7 +358,8 @@ def pvit_large(pretrained=True,search_size=256,template_size=128,
         **kwargs)
     # model.default_cfg = _cfg()
     if pretrained:
-        load_pretrained(model)
+        weight = "https://github.com/whai362/PVT/releases/download/v2/pvt_large.pth"
+        load_pretrained(model,weight)
 
     return model
 
