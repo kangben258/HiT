@@ -255,23 +255,41 @@ class Attention(torch.nn.Module):
         self.proj = torch.nn.Sequential(activation(), Linear_BN(
             self.dh, dim, bn_weight_init=0, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number))
 
-
-        points = list(itertools.product(range(resolution_x), range(resolution_x)))
-        for i in range(template_number):
-            points += list(itertools.product(range(resolution_x+resolution_z*i,resolution_x+resolution_z*(i+1)), range(resolution_x+resolution_z*i,resolution_x+resolution_z*(i+1))))
-        N_xz = len(points)
-        attention_offsets_xz = {}
-        idxs_xz = []
-        for p1 in points:
-            for p2 in points:
-                offset = (abs(p1[0] - p2[0]), abs(p1[1] - p2[1]))
-                if offset not in attention_offsets_xz:
-                    attention_offsets_xz[offset] = len(attention_offsets_xz)
-                idxs_xz.append(attention_offsets_xz[offset])
-        self.attention_biases = torch.nn.Parameter(
-            torch.zeros(num_heads, len(attention_offsets_xz)))
-        self.register_buffer('attention_bias_idxs',
-                             torch.LongTensor(idxs_xz).view(N_xz, N_xz))
+        self.pos = "cat_direct"
+        if self.pos != "ori_pos":
+            if self.pos == "cat_direct":
+                N_xz = resolution_x ** 2 + (resolution_z ** 2) * template_number
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads,N_xz,N_xz)
+                )
+            elif self.pos == "split":
+                N_x = resolution_x ** 2
+                N_z = resolution_z ** 2
+                self.attention_biases_x = torch.nn.Parameter(
+                    torch.zeros(num_heads,N_x,self.key_dim)
+                )
+                self.attention_biases_z = torch.nn.Parameter(
+                    torch.zeros(num_heads,N_z,self.key_dim)
+                )
+        #
+        #
+        else:
+            points = list(itertools.product(range(resolution_x), range(resolution_x)))
+            for i in range(template_number):
+                points += list(itertools.product(range(resolution_x+resolution_z*i,resolution_x+resolution_z*(i+1)), range(resolution_x+resolution_z*i,resolution_x+resolution_z*(i+1))))
+            N_xz = len(points)
+            attention_offsets_xz = {}
+            idxs_xz = []
+            for p1 in points:
+                for p2 in points:
+                    offset = (abs(p1[0] - p2[0]), abs(p1[1] - p2[1]))
+                    if offset not in attention_offsets_xz:
+                        attention_offsets_xz[offset] = len(attention_offsets_xz)
+                    idxs_xz.append(attention_offsets_xz[offset])
+            self.attention_biases = torch.nn.Parameter(
+                torch.zeros(num_heads, len(attention_offsets_xz)))
+            self.register_buffer('attention_bias_idxs',
+                                 torch.LongTensor(idxs_xz).view(N_xz, N_xz))
         # N_xz = resolution_x**2 + (resolution_z**2)*template_number
         # idxs_xz = []
         # for i in range(N_xz):
@@ -282,13 +300,15 @@ class Attention(torch.nn.Module):
         # self.register_buffer('attention_bias_idxs',
         #                      torch.LongTensor(idxs_xz).view(N_xz, N_xz))
 
-        global FLOPS_COUNTER
-        #queries * keys
-        FLOPS_COUNTER += num_heads * (N_xz**2) * key_dim
-        # # softmax
-        FLOPS_COUNTER += num_heads * (N_xz**2)
-        # #attention * v
-        FLOPS_COUNTER += num_heads * self.d * (N_xz**2)
+
+        # remember open!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+        # global FLOPS_COUNTER
+        # #queries * keys
+        # FLOPS_COUNTER += num_heads * (N_xz**2) * key_dim
+        # # # softmax
+        # FLOPS_COUNTER += num_heads * (N_xz**2)
+        # # #attention * v
+        # FLOPS_COUNTER += num_heads * self.d * (N_xz**2)
 
     @torch.no_grad()
     def train(self, mode=True):
@@ -296,7 +316,9 @@ class Attention(torch.nn.Module):
         if mode and hasattr(self, 'ab'):
             del self.ab
         else:
-            self.ab = self.attention_biases[:, self.attention_bias_idxs]
+            if self.pos == "ori_pos":
+                self.ab = self.attention_biases[:, self.attention_bias_idxs]
+
 
     def forward(self, x):  # x (B,N,C)
         B, N, C = x.shape
@@ -307,15 +329,30 @@ class Attention(torch.nn.Module):
         k = k.permute(0, 2, 1, 3)
         v = v.permute(0, 2, 1, 3)
 
-        attn = (
-            (q @ k.transpose(-2, -1)) * self.scale
-            +
-            (self.attention_biases[:, self.attention_bias_idxs]
-             if self.training else self.ab)
-        )
+        if self.pos == "ori_pos":
+            attn = (
+                (q @ k.transpose(-2, -1)) * self.scale
+                +
+                (self.attention_biases[:, self.attention_bias_idxs]
+                 if self.training else self.ab)
+            )
+        elif self.pos == "split":
+            pos = torch.cat((self.attention_biases_x,self.attention_biases_z),dim=1)
+            q = q + pos
+            k = k + pos
+            attn =(
+                (q @ k.transpose(-2, -1)) * self.scale
+            )
+        elif self.pos == "cat_direct":
+            attn = (
+                (q @ k.transpose(-2, -1)) * self.scale
+                +
+                self.attention_biases
+            )
         attn = attn.softmax(dim=-1)
         x = (attn @ v).transpose(1, 2).reshape(B, N, self.dh)
         x = self.proj(x)
+
         return x
 
 class Subsample(torch.nn.Module):
@@ -661,7 +698,7 @@ def load_pretrained(model, weights):
                 state_dict_load[key] = state_dict[key]#attention bias与图片大小有关不能直接load
             else:
                 state_dict_load[key] = model.state_dict()[key]
-    model.load_state_dict(state_dict_load)
+    model.load_state_dict(state_dict_load,strict=False)
 
 
 if __name__ == '__main__':
