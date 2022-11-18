@@ -1,5 +1,3 @@
-import pdb
-
 import numpy as np
 from lib.test.evaluation.data import Sequence, BaseDataset, SequenceList
 from lib.test.utils.load_text import load_text
@@ -33,18 +31,12 @@ class NFSDataset(BaseDataset):
         if 'initOmit' in sequence_info:
             init_omit = sequence_info['initOmit']
 
-        # jiawen, modify,select 30 fps
-        frames = ['{base_path}/{sequence_path}/{frame:0{nz}}.{ext}'.format(base_path=self.base_path,
-        sequence_path=sequence_path.split('/')[-1]+'/30/'+sequence_path.split('/')[-1], frame=frame_num, nz=nz, ext=ext)
-                  for frame_num in range(start_frame+init_omit, end_frame+1)]
-        # frames = ['{base_path}/{sequence_path}/{frame:0{nz}}.{ext}'.format(base_path=self.base_path,
-        # sequence_path=sequence_path, frame=frame_num, nz=nz, ext=ext) for frame_num in range(start_frame+init_omit, end_frame+1)]
+        frames = ['{base_path}/{sequence_path}/{frame:0{nz}}.{ext}'.format(base_path=self.base_path, 
+        sequence_path=sequence_path, frame=frame_num, nz=nz, ext=ext) for frame_num in range(start_frame+init_omit, end_frame+1)]
 
-        anno_path = '{}/{}'.format(self.base_path, sequence_path.split('/')[-1]+'/30/'+ sequence_info['anno_path'].split('nfs_')[-1])
-        anno_path = anno_path.replace('.txt', '_pytracking.txt')
-        # anno_path = '{}/{}'.format(self.base_path, sequence_info['anno_path'])
-        ground_truth_rect = load_text(str(anno_path), delimiter=',', dtype=np.float64)
-        # ground_truth_rect = load_text(str(anno_path), delimiter='\t', dtype=np.float64)
+        anno_path = '{}/{}'.format(self.base_path, sequence_info['anno_path'])
+
+        ground_truth_rect = load_text(str(anno_path), delimiter='\t', dtype=np.float64)
 
         return Sequence(sequence_info['name'], frames, 'nfs', ground_truth_rect[init_omit:,:],
                         object_class=sequence_info['object_class'])

@@ -70,7 +70,9 @@ class EnvSettings_ITP:
         self.got10k_lmdb_path = os.path.join(data_dir, 'got10k_lmdb')
         self.lasot_path = os.path.join(data_dir, 'lasot')
         self.lasot_lmdb_path = os.path.join(data_dir, 'lasot_lmdb')
+        self.lasot_extension_subset_path = os.path.join(data_dir, 'lasot_extension_subset')
         self.trackingnet_path = os.path.join(data_dir, 'trackingnet')
+        self.tnl2k_path = os.path.join(data_dir, 'tnl2k')
         self.davis_dir = ''
         self.youtubevos_dir = ''
 
