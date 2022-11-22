@@ -5,8 +5,6 @@ from lib.test.tracker.vittrack_utils import sample_target
 import cv2
 import os
 import lib.models.vt.levit_utils as utils
-from lib.utils.merge import merge_template_search
-# from lib.models.vittrack import build_vittrack_baseline
 from lib.models.vt import build_vt
 from lib.test.tracker.vittrack_utils import Preprocessor
 from lib.utils.box_ops import clip_box
@@ -68,10 +66,9 @@ class VT(BaseTracker):
         search = self.preprocessor.process(x_patch_arr)
         images_list = [search, self.template]
         with torch.no_grad():
-            # xz = self.network.forward_backbone(search, self.template)
             xz = self.network.forward_backbone(images_list)
-            # run the transformer
-            out_dict, _, _ = self.network.forward_transformer(xz=xz)
+            # run the head
+            out_dict, _, _ = self.network.forward_head(xz=xz)
 
         pred_boxes = out_dict['pred_boxes'].view(-1, 4)
         # Baseline: Take the mean of all pred boxes as the final result

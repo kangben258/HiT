@@ -3,24 +3,11 @@ Backbone modules.
 """
 
 import torch
-import torch.nn.functional as F
 from torch import nn
-from torchvision.models._utils import IntermediateLayerGetter
-from typing import Dict, List
 from lib.utils.misc import is_main_process
-# from .position_encoding import build_position_encoding
-from lib.models.stark import resnet as resnet_module
-from lib.models.stark.repvgg import get_RepVGG_func_by_name
 from lib.models.vt import levit as levit_module
-from lib.models.vt import tinyvit_global as tinyvit_module  #if use global
-from lib.models.vt import mobilevit_cat as mobilevit_module
 from lib.models.vt import pvt as pvt_module
-# from lib.models.vt.mobilevit.options.opts import get_training_arguments
-# from lib.models.vt.mobilevit.cvnets.models.classification import build_classification_model
-# from lib.models.vt import tinyvit_split as tinyvit_module   #if ust split
-# from lib.models.vt import levit_ori as levit_module
 import os
-
 
 class FrozenBatchNorm2d(torch.nn.Module):
     """
@@ -69,7 +56,6 @@ class BackboneBase(nn.Module):
         open_blocks = open_layers[2:]
         open_items = open_layers[0:2]
         for name, parameter in backbone.named_parameters():
-            # if not train_backbone or 'layer2' not in name and 'layer3' not in name:
 
             if not train_backbone:
                 freeze = True
@@ -80,43 +66,11 @@ class BackboneBase(nn.Module):
                     freeze = False
                 if freeze == True:
                     parameter.requires_grad_(False)  # here should allow users to specify which layers to freeze !
-                    #print('freeze %s'%name)
-                #print('the unfrozen layers in backbone:')
-                #print([n for n, p in backbone.named_parameters() if p.requires_grad])
-
-        # if return_interm_layers:
-        #     if net_type == "resnet":
-        #         return_layers = {"layer1": "0", "layer2": "1", "layer3": "2"}  # stride = 4, 8, 16
-        #     elif net_type == "repvgg":
-        #         return_layers = {"stage1": "0", "stage2": "1", "stage3": "2"}
-        #     else:
-        #         raise ValueError()
-        # else:
-        #     if net_type == "resnet":
-        #         return_layers = {'layer3': "0"}  # stride = 16
-        #     elif net_type == "repvgg":
-        #         return_layers = {'stage3': "0"}  # stride = 16
-        #     else:
-        #         raise ValueError()
-        # self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)  # method in torchvision
         self.body = backbone
         self.num_channels = num_channels
 
-    # def forward(self, tensor_list: NestedTensor):
-    #     xs = self.body(tensor_list.tensors)
-    #     out: Dict[str, NestedTensor] = {}
-    #     for name, x in xs.items():
-    #         m = tensor_list.mask
-    #         assert m is not None
-    #         mask = F.interpolate(m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
-    #         out[name] = NestedTensor(x, mask)
-    #     return out
-
     def forward(self, images_list):
         xs = self.body(images_list)
-        # out = {}
-        # for name, x in xs.items():
-        #     out[name] = x
         return xs
 
 
@@ -135,52 +89,8 @@ class Backbone(BackboneBase):
                  neck_type: str,
                  open_layers: list,
                  ckpt_path=None):
-        if "resnet" in name:
-            norm_layer = FrozenBatchNorm2d if freeze_bn else nn.BatchNorm2d
-            # here is different from the original DETR because we use feature from block3
-            backbone = getattr(resnet_module, name)(
-                replace_stride_with_dilation=[False, dilation, False],
-                pretrained=is_main_process(), norm_layer=norm_layer, last_layer='layer3')
-            num_channels = 256 if name in ('resnet18', 'resnet34') else 1024
-            net_type = "resnet"
-        elif "RepVGG" in name:
-            print("#" * 10 + "  Freeze_BN and Dilation are not supported in current code  " + "#" * 10)
-            # here is different from the original DETR because we use feature from block3
-            repvgg_func = get_RepVGG_func_by_name(name)
-            backbone = repvgg_func(deploy=False, last_layer="stage3")
-            num_channels = 192  # 256x0.75=192
-            try:
-                ckpt = torch.load(ckpt_path, map_location='cpu')
-                missing_keys, unexpected_keys = backbone.load_state_dict(ckpt, strict=False)
-                print("missing keys:", missing_keys)
-                print("unexpected keys:", unexpected_keys)
-            except:
-                print("Warning: Pretrained RepVGG weights are not loaded")
-            net_type = "repvgg"
-        elif "vit" in name.lower():
-            # norm_layer = FrozenBatchNorm2d if freeze_bn else nn.BatchNorm2d
+        if "vit" in name.lower():
             # todo: frozenlayernorm
-            if "tiny_vit" in name:
-                backbone = getattr(tinyvit_module,name)(
-                    num_classes=0,
-                    pretrained=is_main_process(),
-                    search_size=search_size,
-                    template_size=template_size,
-                    template_number=template_number,
-                    neck_type=neck_type
-                )
-                num_channels = 576
-                net_type = "tiny_vit"
-
-            if "mobilevit" in name:
-                backbone = getattr(mobilevit_module,name)(
-                    pretrained=is_main_process(),num_classes=0,
-                    search_size=search_size,template_size=template_size,
-                    template_number=template_number,neck_type=neck_type
-                )
-                num_channels = 640  #output channel
-                net_type = "mobilevit"
-
             if "pvit" in name:
                 backbone = getattr(pvt_module,name)(
                     pretrained=is_main_process(),
@@ -224,13 +134,7 @@ class Backbone(BackboneBase):
 def build_backbone(cfg):
     train_backbone = (cfg.TRAIN.BACKBONE_MULTIPLIER > 0) and (cfg.TRAIN.FREEZE_BACKBONE == False)
     return_interm_layers = cfg.MODEL.PREDICT_MASK
-    if cfg.MODEL.BACKBONE.TYPE == "RepVGG-A0":
-        try:
-            ckpt_path = os.path.join(cfg.ckpt_dir, "RepVGG-A0-train.pth")
-        except:
-            ckpt_path = None
-    else:
-        ckpt_path = None
+    ckpt_path = None
     backbone = Backbone(cfg.MODEL.BACKBONE.TYPE, train_backbone, return_interm_layers,
                         cfg.MODEL.BACKBONE.DILATION, cfg.MODEL.BACKBONE.PRETRAIN_TYPE,
                         cfg.DATA.SEARCH.SIZE, cfg.DATA.SEARCH.NUMBER,

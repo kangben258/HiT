@@ -1,8 +1,6 @@
 from . import BaseActor
-from lib.utils.misc import NestedTensor
 from lib.utils.box_ops import box_cxcywh_to_xyxy, box_xywh_to_xyxy
 import torch
-from lib.utils.merge import merge_template_search
 
 
 class VTActor(BaseActor):
@@ -43,12 +41,9 @@ class VTActor(BaseActor):
         for i in range(self.settings.num_template):
             template_img = data['template_images'][i].view(-1, *data['template_images'].shape[2:])  # (batch, 3, 192, 192)
             images_list.append(template_img)
-
-
         feature_xz = self.net(images_list=images_list, mode='backbone')
 
-        out_dict, _, _ = self.net(xz=feature_xz, mode="transformer", run_box_head=run_box_head, run_cls_head=run_cls_head)
-        # out_dict: (B, N, C), outputs_coord: (1, B, N, C), target_query: (1, B, N, C)
+        out_dict, _, _ = self.net(xz=feature_xz, mode="head", run_box_head=run_box_head, run_cls_head=run_cls_head)
         return out_dict
 
     def compute_losses(self, pred_dict, gt_bbox, return_status=True):

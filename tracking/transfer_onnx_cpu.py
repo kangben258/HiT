@@ -19,14 +19,12 @@ import importlib
 def parse_args():
     parser = argparse.ArgumentParser(description='Parse args for training')
     parser.add_argument('--script', type=str, default='vt', help='script name')
-    # parser.add_argument('--config', type=str, default='v_b_16_256_bs16', help='yaml configure file name')
-    parser.add_argument('--config', type=str, default='lv_fpn_256_c384_3sch', help='yaml configure file name')
+    parser.add_argument('--config', type=str, default='HiT_Base', help='yaml configure file name')
     args = parser.parse_args()
     return args
 
 
 def get_data(bs=1, sz=256):
-    # img_patch = torch.randn(bs, 3, sz, sz, requires_grad=True)
     img_patch = torch.randn(bs, 3, sz, sz)
     return img_patch
 
@@ -38,7 +36,7 @@ class VT(nn.Module):
         self.num_patch_x = self.backbone.body.num_patches_search
         self.num_patch_z = self.backbone.body.num_patches_template
         self.neck_type = neck_type
-        if neck_type in ['UPSAMPLE', 'FPN']:
+        if neck_type in ['UPSAMPLE', 'FB','MAXF','MAXMINF','MAXMIDF','MINMIDF','MIDF','MINF']:
             self.num_patch_x = self.backbone.body.num_patches_search * ((bottleneck.stride_total) ** 2)
         self.side_fx = int(self.num_patch_x ** 0.5)
         self.side_fz = int(self.num_patch_z ** 0.5)
@@ -53,15 +51,11 @@ class VT(nn.Module):
         # run the backbone
         img_list = [search,template]
         xz = self.backbone(img_list) # BxCxHxW
-        # xz = self.backbone(search, template)
-        if self.neck_type == 'FPN':
+        if self.neck_type in ['FB','MAXF','MAXMINF','MAXMIDF','MINMIDF','MIDF','MINF']:
             xz_mem = self.bottleneck(xz)
         else:
             xz_mem = xz[-1].permute(1, 0, 2)
             xz_mem = self.bottleneck(xz_mem)
-        # xz_mem = self.bottleneck(xz)
-        # xz_mem = xz[-1].permute(1, 0, 2)
-        # xz_mem = self.bottleneck(xz_mem)
         output_embed = xz_mem[0:1,:,:].unsqueeze(-2)
         x_mem = xz_mem[1:1+self.num_patch_x]
         # adjust shape
@@ -69,7 +63,6 @@ class VT(nn.Module):
         dec_opt = output_embed.squeeze(0).transpose(1, 2)  # (B, C, N)
         att = torch.matmul(enc_opt, dec_opt)  # (B, HW, N)
         opt = (enc_opt.unsqueeze(-1) * att.unsqueeze(-2)).permute((0, 3, 2, 1)).contiguous()  # (B, HW, C, N) --> (B, N, C, HW)
-        # opt = enc_opt.unsqueeze(1).permute(0, 1, 3, 2).contiguous()
         bs, Nq, C, HW = opt.size()
         opt_feat = opt.view(-1, C, self.feat_sz_s, self.feat_sz_s)
         # run the corner head
@@ -114,21 +107,13 @@ if __name__ == "__main__":
     bottleneck = model.bottleneck
     box_head = model.box_head
     torch_model = VT(backbone, bottleneck, box_head, head_type=cfg.MODEL.HEAD_TYPE, neck_type=cfg.MODEL.NECK.TYPE)
-    # torch_model.cuda()
     torch_model.eval()
-    # print(torch_model)
-    # torch.save(torch_model.state_dict(), "complete.pth")
     # get the network input
     bs = 1
     sz_x = cfg.TEST.SEARCH_SIZE
     sz_z = cfg.TEST.TEMPLATE_SIZE
     search = get_data(bs=bs, sz=sz_x)
-    # search_cuda = search.cuda()
     template = get_data(bs=bs, sz=sz_z)
-    # template_cuda = template.cuda()
-    # img_list = [search, template]
-    # torch_outs = torch_model(img_list)
-    # torch_outs = torch_model(search, template)
     torch.onnx.export(torch_model,  # model being run
                       (search, template),  # model input (a tuple for multiple inputs)
                       save_name,  # where to save the model (can be a file or file-like object)
@@ -143,26 +128,14 @@ if __name__ == "__main__":
     """########## inference with the pytorch model ##########"""
     # forward the template
     N = 50
-    # torch_model = torch_model.cuda()
-    # torch_model.eval() # to move attention.ab to cuda for levit
-    # torch_model.box_head.coord_x = torch_model.box_head.coord_x.cuda()
-    # torch_model.box_head.coord_y = torch_model.box_head.coord_y.cuda()
-
     # """########## inference with the onnx model ##########"""
     onnx_model = onnx.load(save_name)
     onnx.checker.check_model(onnx_model)
     print("creating session...")
     ort_session = onnxruntime.InferenceSession(save_name)
-    # # ort_session.set_providers(["TensorrtExecutionProvider"],
-    # #                   [{'device_id': '1', 'trt_max_workspace_size': '2147483648', 'trt_fp16_enable': 'True'}])
     print("execuation providers:")
     print(ort_session.get_providers())
     # # compute ONNX Runtime output prediction
-    # generate data
-    # search = get_data(bs=bs, sz=sz_x)
-    # template = get_data(bs=bs, sz=sz_z)
-    # pytorch inference
-    # search_cuda, template_cuda = search.cuda(), template.cuda()
     ort_inputs = {'search': to_numpy(search).astype(np.float32),
                   'template': to_numpy(template).astype(np.float32)
                   }
@@ -183,7 +156,6 @@ if __name__ == "__main__":
     t_pyt += lat_pyt
     s_ort = time.time()
     for i in range(N):
-        # ort_inputs = model(xz=model([search_cuda, template_cuda], mode="backbone"), mode="transformer")[0]
         ort_outs = ort_session.run(None, ort_inputs)
     e_ort = time.time()
     lat_ort = e_ort - s_ort
@@ -195,7 +167,6 @@ if __name__ == "__main__":
     np.testing.assert_allclose(to_numpy(torch_outs), ort_outs[0], rtol=1e-03, atol=1e-05)
     print("The deviation between the first output: {}".format(np.max(np.abs(to_numpy(torch_outs[0]) - ort_outs[0]))))
     #
-    # print("Exported model has been tested with ONNXRuntime, and the result looks good!")
 
 
 

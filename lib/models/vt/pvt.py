@@ -9,9 +9,8 @@ from timm.models.registry import register_model
 from timm.models.vision_transformer import _cfg
 
 __all__ = [
-    'pvt_tiny', 'pvt_small', 'pvt_medium', 'pvt_large'
+   'pvt_small' , 'pvt_large'
 ]
-
 
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -126,7 +125,7 @@ class PatchEmbed(nn.Module):
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
         self.norm = nn.LayerNorm(embed_dim)
 
-    def forward(self, iamge_list):#x==>image_list
+    def forward(self, iamge_list):
         for i in range(len(iamge_list)):
             x = iamge_list[i]
             B, C, H, W = x.shape
@@ -149,7 +148,7 @@ class PyramidVisionTransformer(nn.Module):
                  num_heads=[1, 2, 4, 8], mlp_ratios=[4, 4, 4, 4], qkv_bias=False, qk_scale=None, drop_rate=0.,
                  attn_drop_rate=0., drop_path_rate=0., norm_layer=nn.LayerNorm,
                  depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1], search_size=256,template_size=128,
-              template_number=1,neck_type="FPN",num_stages=4):
+              template_number=1,neck_type="FB",num_stages=4):
         super().__init__()
         self.num_classes = num_classes
         self.depths = depths
@@ -187,12 +186,6 @@ class PyramidVisionTransformer(nn.Module):
             setattr(self, f"block{i + 1}", block)
 
         self.norm = norm_layer(embed_dims[3])
-
-        # cls_token
-        # self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dims[3]))
-
-        # classification head
-        # self.head = nn.Linear(embed_dims[3], num_classes) if num_classes > 0 else nn.Identity()
 
         # init weights
         for i in range(num_stages):
@@ -253,8 +246,6 @@ class PyramidVisionTransformer(nn.Module):
 
             x, (search_H, search_W, template_H, template_W) = patch_embed(x)
 
-            # pos_embed = self._get_pos_embed(pos_embed, patch_embed, search_H, search_W, template_H, template_W)
-
             x = pos_drop(x + pos_embed)
             for blk in block:
                 x = blk(x, search_H, search_W, template_H, template_W)#x==>(B,n,c)
@@ -273,7 +264,6 @@ class PyramidVisionTransformer(nn.Module):
 
     def forward(self, x):#x==>image_list
         x = self.forward_features(x)
-        # x = self.head(x)
 
         return x
 
@@ -297,78 +287,40 @@ def load_pretrained(model,url):
         map_location='cpu', check_hash=False,
     )
     state_dict = checkpoint
-    # s = model.state_dict()
-    # model.load_state_dict(state_dict)
     state_dict_load = OrderedDict()
     for key in state_dict.keys():
         if key in model.state_dict().keys():
             if ("pos_embed" not in key):
-                state_dict_load[key] = state_dict[key]#attention bias与图片大小有关不能直接load
+                state_dict_load[key] = state_dict[key]
             else:
                 state_dict_load[key] = model.state_dict()[key]
     model.load_state_dict(state_dict_load)
 
-@register_model
-def pvit_tiny(pretrained=True,search_size=256,template_size=128,
-              template_number=1,neck_type="FPN",**kwargs):
-    model = PyramidVisionTransformer(
-        patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[2, 2, 2, 2], sr_ratios=[8, 4, 2, 1],
-        search_size=search_size, template_size=template_size, template_number=template_number, neck_type=neck_type,
-        **kwargs)
-    # model.default_cfg = _cfg()
-
-    return model
-
 
 @register_model
 def pvit_small(pretrained=False,search_size=256,template_size=128,
-              template_number=1,neck_type="FPN", **kwargs):
+              template_number=1,neck_type="FB", **kwargs):
     model = PyramidVisionTransformer(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 6, 3], sr_ratios=[8, 4, 2, 1],
         search_size=search_size, template_size=template_size, template_number=template_number, neck_type=neck_type,
         **kwargs)
-    # model.default_cfg = _cfg()
     if pretrained:
         weight = "https://github.com/whai362/PVT/releases/download/v2/pvt_small.pth"
         load_pretrained(model,weight)
 
     return model
 
-
-@register_model
-def pvt_medium(pretrained=False, **kwargs):
-    model = PyramidVisionTransformer(
-        patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 18, 3], sr_ratios=[8, 4, 2, 1],
-        **kwargs)
-    model.default_cfg = _cfg()
-
-    return model
-
-
 @register_model
 def pvit_large(pretrained=True,search_size=256,template_size=128,
-              template_number=1,neck_type="FPN",**kwargs):
+              template_number=1,neck_type="FB",**kwargs):
     model = PyramidVisionTransformer(
         patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 8, 27, 3], sr_ratios=[8, 4, 2, 1],
         search_size = search_size,template_size=template_size,template_number=template_number,neck_type=neck_type,
         **kwargs)
-    # model.default_cfg = _cfg()
     if pretrained:
         weight = "https://github.com/whai362/PVT/releases/download/v2/pvt_large.pth"
         load_pretrained(model,weight)
 
     return model
-
-
-@register_model
-def pvt_huge_v2(pretrained=False, **kwargs):
-    model = PyramidVisionTransformer(
-        patch_size=4, embed_dims=[128, 256, 512, 768], num_heads=[2, 4, 8, 12], mlp_ratios=[8, 8, 4, 4], qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 10, 60, 3], sr_ratios=[8, 4, 2, 1],
-        # drop_rate=0.0, drop_path_rate=0.02)
-        **kwargs)
-    model.default_cfg = _cfg()

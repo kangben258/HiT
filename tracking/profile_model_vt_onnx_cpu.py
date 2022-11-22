@@ -2,8 +2,6 @@ import argparse
 import torch
 import _init_paths
 from lib.utils.merge import merge_template_search
-# from lib.config.stark_s.config import cfg, update_config_from_file
-# from lib.models.stark.stark_s import build_starks
 from thop import profile
 from thop.utils import clever_format
 import time
@@ -23,8 +21,7 @@ def parse_args():
     # for train
     parser.add_argument('--script', type=str, default='vt',
                         help='training script name')
-    # parser.add_argument('--config', type=str, default='v_b_16_256_bs16', help='yaml configure file name')
-    parser.add_argument('--config', type=str, default='lv_fpn_256_c384_3sch', help='yaml configure file name')
+    parser.add_argument('--config', type=str, default='HiT_Base', help='yaml configure file name')
     args = parser.parse_args()
 
     return args
@@ -71,8 +68,6 @@ def to_numpy(tensor):
     return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
 if __name__ == "__main__":
-    # device = "cuda:1"
-    # torch.cuda.set_device(device)
     # Compute the Flops and Params of our STARK-S model
     args = parse_args()
     '''update cfg'''
@@ -91,9 +86,6 @@ if __name__ == "__main__":
         # get the template and search
         template = get_data(bs, z_sz)
         search = get_data(bs, x_sz)
-        # transfer to device
-        # template = template.to(device)
-        # search = search.to(device)
         ort_inputs = {'search': to_numpy(search).astype(np.float32),
                       'template': to_numpy(template).astype(np.float32)
                       }

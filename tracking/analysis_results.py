@@ -12,18 +12,6 @@ dataset_name = 'lasot_lmdb'
 #                             run_ids=None, display_name='vittrack_baseline'))
 trackers.extend(trackerlist(name='vt', parameter_name='lv_min_mid_256_c384', dataset_name=dataset_name,
                             run_ids=None, display_name='lv_min_mid_256_c384'))
-"""stark"""
-# trackers.extend(trackerlist(name='stark_s', parameter_name='baseline', dataset_name=dataset_name,
-#                             run_ids=None, display_name='STARK-S50'))
-# trackers.extend(trackerlist(name='stark_st', parameter_name='baseline', dataset_name=dataset_name,
-#                             run_ids=None, display_name='STARK-ST50'))
-# trackers.extend(trackerlist(name='stark_st', parameter_name='baseline_R101', dataset_name=dataset_name,
-#                             run_ids=None, display_name='STARK-ST101'))
-"""TransT"""
-# trackers.extend(trackerlist(name='TransT_N2', parameter_name=None, dataset_name=None,
-#                             run_ids=None, display_name='TransT_N2', result_only=True))
-# trackers.extend(trackerlist(name='TransT_N4', parameter_name=None, dataset_name=None,
-#                             run_ids=None, display_name='TransT_N4', result_only=True))
 """pytracking"""
 # trackers.extend(trackerlist('atom', 'default', None, range(0,5), 'ATOM'))
 # trackers.extend(trackerlist('dimp', 'dimp18', None, range(0,5), 'DiMP18'))

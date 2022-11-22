@@ -2,8 +2,6 @@ import argparse
 import torch
 import _init_paths
 from lib.utils.merge import merge_template_search
-# from lib.config.stark_s.config import cfg, update_config_from_file
-# from lib.models.stark.stark_s import build_starks
 from thop import profile
 from thop.utils import clever_format
 import time
@@ -20,8 +18,7 @@ def parse_args():
     # for train
     parser.add_argument('--script', type=str, default='vt',
                         help='training script name')
-    # parser.add_argument('--config', type=str, default='v_l_16_384_bs16', help='yaml configure file name')
-    parser.add_argument('--config', type=str, default='lv_fpn_256_c384_3sch', help='yaml configure file name')
+    parser.add_argument('--config', type=str, default='HiT_Base', help='yaml configure file name')
     args = parser.parse_args()
 
     return args
@@ -52,12 +49,12 @@ def evaluate(model, images_list, xz, run_box_head, run_cls_head, bs):
     macs, params = clever_format([macs1, params1], "%.3f")
     print('backbone macs is ', macs)
     print('backbone params is ', params)
-    # transformer and head
-    macs2, params2 = profile(model, inputs=(None, xz, "transformer", True, True),
+    #head
+    macs2, params2 = profile(model, inputs=(None, xz, "head", True, True),
                              custom_ops=custom_ops, verbose=False)
     macs, params = clever_format([macs2, params2], "%.3f")
-    print('transformer and head macs is ', macs)
-    print('transformer and head params is ', params)
+    print('head macs is ', macs)
+    print('head params is ', params)
     # the whole model
     macs, params = clever_format([macs1 + macs2, params1 + params2], "%.3f")
     print('overall macs is ', macs)
@@ -68,24 +65,15 @@ def evaluate(model, images_list, xz, run_box_head, run_cls_head, bs):
     T_t = 500
     print("testing speed ...")
     with torch.no_grad():
-        # backbone
-        # for i in range(T_w):
-        #     _ = model(images_list, None, "backbone", run_box_head, run_cls_head)
-        # start = time.time()
-        # for i in range(T_t):
-        #     _ = model(images_list, None, "backbone", run_box_head, run_cls_head)
-        # end = time.time()
-        # avg_lat = (end - start) / (T_t * bs)
-        # print("The average backbone latency is %.2f ms" % (avg_lat * 1000))
 
         # # overall
         for i in range(T_w):
             _ = model(images_list, None, "backbone", run_box_head, run_cls_head)
-            _ = model(None, xz, "transformer", run_box_head, run_cls_head)
+            _ = model(None, xz, "head", run_box_head, run_cls_head)
         start = time.time()
         for i in range(T_t):
             _ = model(images_list, None, "backbone", run_box_head, run_cls_head)
-            _ = model(None, xz, "transformer", run_box_head, run_cls_head)
+            _ = model(None, xz, "head", run_box_head, run_cls_head)
         end = time.time()
         avg_lat = (end - start) / (T_t * bs)
         print("The average overall latency is %.2f ms" % (avg_lat * 1000))
@@ -115,17 +103,13 @@ if __name__ == "__main__":
         model_constructor = model_module.build_vt
         model = model_constructor(cfg)
         # merge conv+bn for levit
-        # if "LeViT" in cfg.MODEL.BACKBONE.TYPE:
-        #     # merge conv+bn to one operator
-        #     utils.replace_batchnorm(model.backbone.body)
+        if "LeViT" in cfg.MODEL.BACKBONE.TYPE:
+            # merge conv+bn to one operator
+            utils.replace_batchnorm(model.backbone.body)
         # get the template and search
+        # change the head's params' device to CPU
         template = get_data(bs, z_sz)
         search = get_data(bs, x_sz)
-        # transfer to device
-        # model = model.to(device)
-        # template = template.to(device)
-        # search = search.to(device)
-        # evaluate the model properties
         images_list = [search, template]
         xz = model.forward_backbone(images_list)
         evaluate(model, images_list, xz, run_box_head=True, run_cls_head=False, bs=bs)

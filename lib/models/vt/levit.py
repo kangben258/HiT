@@ -33,41 +33,6 @@ specification = {
 
 __all__ = [specification.keys()]
 
-
-# @register_model
-# def LeViT_128S(num_classes=1000, distillation=True,
-#                pretrained=False, fuse=False):
-#     return model_factory(**specification['LeViT_128S'], num_classes=num_classes,
-#                          distillation=distillation, pretrained=pretrained, fuse=fuse)
-#
-#
-# @register_model
-# def LeViT_128(num_classes=1000, distillation=True,
-#               pretrained=False, fuse=False):
-#     return model_factory(**specification['LeViT_128'], num_classes=num_classes,
-#                          distillation=distillation, pretrained=pretrained, fuse=fuse)
-#
-#
-# @register_model
-# def LeViT_192(num_classes=1000, distillation=True,
-#               pretrained=False, fuse=False):
-#     return model_factory(**specification['LeViT_192'], num_classes=num_classes,
-#                          distillation=distillation, pretrained=pretrained, fuse=fuse)
-#
-#
-# @register_model
-# def LeViT_256(num_classes=1000, distillation=True,
-#               pretrained=False, fuse=False):
-#     return model_factory(**specification['LeViT_256'], num_classes=num_classes,
-#                          distillation=distillation, pretrained=pretrained, fuse=fuse)
-#
-#
-# @register_model
-# def LeViT_384(num_classes=1000, distillation=True,
-#               pretrained=False, fuse=False):
-#     return model_factory(**specification['LeViT_384'], num_classes=num_classes,
-#                          distillation=distillation, pretrained=pretrained, fuse=fuse)
-
 @register_model
 def LeViT_128S(num_classes=1000, distillation=True,
               pretrained=False, fuse=False,
@@ -254,8 +219,9 @@ class Attention(torch.nn.Module):
         self.qkv = Linear_BN(dim, h, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
         self.proj = torch.nn.Sequential(activation(), Linear_BN(
             self.dh, dim, bn_weight_init=0, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number))
-
-        self.pos = "cat_direct"
+        # different position encoding for ablation study <"ori_pos";"split";"cat_direct"> for choice
+        self.pos = "ori_pos"
+        ###########################
         if self.pos != "ori_pos":
             if self.pos == "cat_direct":
                 N_xz = resolution_x ** 2 + (resolution_z ** 2) * template_number
@@ -271,8 +237,7 @@ class Attention(torch.nn.Module):
                 self.attention_biases_z = torch.nn.Parameter(
                     torch.zeros(num_heads,N_z,self.key_dim)
                 )
-        #
-        #
+        # dual-image position encoding
         else:
             points = list(itertools.product(range(resolution_x), range(resolution_x)))
             for i in range(template_number):
@@ -290,16 +255,6 @@ class Attention(torch.nn.Module):
                 torch.zeros(num_heads, len(attention_offsets_xz)))
             self.register_buffer('attention_bias_idxs',
                                  torch.LongTensor(idxs_xz).view(N_xz, N_xz))
-        # N_xz = resolution_x**2 + (resolution_z**2)*template_number
-        # idxs_xz = []
-        # for i in range(N_xz):
-        #     for j in range(N_xz):
-        #         idxs_xz.append(abs(j-i))
-        # self.attention_biases = torch.nn.Parameter(
-        #     torch.zeros(num_heads, N_xz))
-        # self.register_buffer('attention_bias_idxs',
-        #                      torch.LongTensor(idxs_xz).view(N_xz, N_xz))
-
         global FLOPS_COUNTER
         #queries * keys
         # FLOPS_COUNTER += num_heads * (N_xz**2) * key_dim
@@ -374,8 +329,6 @@ class Subsample(torch.nn.Module):
                     :, ::self.stride, ::self.stride].reshape(B, -1, C)
                 xz_ = torch.cat((xz_, z), dim=1)
 
-        # x = x.view(B, self.resolution, self.resolution, C)[
-        #     :, ::self.stride, ::self.stride].reshape(B, -1, C)
         return xz_
 
 class AttentionSubsample(torch.nn.Module):
@@ -413,7 +366,7 @@ class AttentionSubsample(torch.nn.Module):
         self.resolution_x = resolution_x
         self.resolution_z = resolution_z
 
-        self.pos = "cat_direct"
+        self.pos = "ori_pos"
         if self.pos != "ori_pos":
             if self.pos == "cat_direct":
                 N_xz = resolution_x ** 2 + (resolution_z ** 2) * template_number
@@ -454,7 +407,7 @@ class AttentionSubsample(torch.nn.Module):
             idxs = []
             for p1 in points_:
                 for p2 in points:
-                    size = 1  #why there is a size
+                    size = 1
                     offset = (
                         abs(p1[0] * stride - p2[0] + (size - 1) / 2),
                         abs(p1[1] * stride - p2[1] + (size - 1) / 2))
@@ -494,8 +447,6 @@ class AttentionSubsample(torch.nn.Module):
                                1).split([self.key_dim, self.d], dim=3)
         k = k.permute(0, 2, 1, 3)  # BHNC
         v = v.permute(0, 2, 1, 3)  # BHNC
-        # q = self.q(x).view(B, self.resolution_2, self.num_heads,
-        #                    self.key_dim).permute(0, 2, 1, 3)
         q = self.q(x).view(B, -1, self.num_heads,
                            self.key_dim).permute(0, 2, 1, 3)
 
@@ -621,12 +572,12 @@ class LeViT(torch.nn.Module):
         if distillation:
             self.head_dist = BN_Linear(
                 embed_dim[-1], num_classes) if num_classes > 0 else torch.nn.Identity()
-        if self.neck_type == 'FPN' or self.neck_type == 'MAXF' or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
-            fpn_idx = []
+        if self.neck_type == 'FB' or self.neck_type == 'MAXF' or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
+            fb_idx = []
             for i in range(len(self.blocks)):
                 if self.blocks[i]._get_name() == 'AttentionSubsample':
-                    fpn_idx.append(i)
-            self.fpn_idx = fpn_idx
+                    fb_idx.append(i)
+            self.fb_idx = fb_idx
 
         self.FLOPS = FLOPS_COUNTER
         FLOPS_COUNTER = 0
@@ -636,9 +587,6 @@ class LeViT(torch.nn.Module):
         return {x for x in self.state_dict().keys() if 'attention_biases' in x}
 
     def forward_features(self, images_list):
-        # x = images_list[0]
-        # x = self.patch_embed(x)  # [bs, 3, 256, 256] --> [bs, 384, 16, 16]
-        # x = x.flatten(2).transpose(1, 2) #[bs, 256, 384]
         for i in range(len(images_list)):
             x = images_list[i]
             x = self.patch_embed(x)
@@ -647,11 +595,11 @@ class LeViT(torch.nn.Module):
                 xz = x
             else:
                 xz = torch.cat((xz, x), dim=1)
-        if self.neck_type == 'FPN' or self.neck_type == "MAXF" or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
-            assert len(self.fpn_idx) == 2
-            xz1 = self.blocks[0:self.fpn_idx[0]](xz)
-            xz2 = self.blocks[self.fpn_idx[0]:self.fpn_idx[1]](xz1)
-            xz = self.blocks[self.fpn_idx[1]:](xz2)
+        if self.neck_type == 'FB' or self.neck_type == "MAXF" or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
+            assert len(self.fb_idx) == 2
+            xz1 = self.blocks[0:self.fb_idx[0]](xz)
+            xz2 = self.blocks[self.fb_idx[0]:self.fb_idx[1]](xz1)
+            xz = self.blocks[self.fb_idx[1]:](xz2)
             out_list = [xz1, xz2]
         else:
             xz = self.blocks(xz) #[bs, 20, 768]
@@ -659,19 +607,11 @@ class LeViT(torch.nn.Module):
 
         cls = xz.mean(1).unsqueeze(1) #[bs, 1, 768]
         cxz = torch.cat((cls, xz), dim=1)
-        # if self.distillation:
-        #     x = self.head(x), self.head_dist(x)
-        #     if not self.training:
-        #         x = (x[0] + x[1]) / 2
-        # else:
-        #     x = self.head(x)
         out_list.append(cxz)
         return out_list
 
     def forward(self, images_list):
         out_list = self.forward_features(images_list)
-        # x = self.head(x)
-        # out=[xz]
         return out_list
 
 
@@ -720,25 +660,13 @@ def load_pretrained(model, weights):
     checkpoint = torch.hub.load_state_dict_from_url(
         weights, map_location='cpu')
     state_dict = checkpoint['model']
-    # state_dict_load = OrderedDict()
-    # for key in state_dict.keys():
-    #     if key[0:7] == 'visual.':
-    #         state_dict_load[key[7:]] = state_dict[key]
     state_dict_load = OrderedDict()
     for key in state_dict.keys():
         if key in model.state_dict().keys():
             if ("attention_bias" not in key):
-                state_dict_load[key] = state_dict[key]#attention bias与图片大小有关不能直接load
+                state_dict_load[key] = state_dict[key]
             else:
                 state_dict_load[key] = model.state_dict()[key]
     model.load_state_dict(state_dict_load,strict=False)
 
 
-if __name__ == '__main__':
-    for name in specification:
-        net = globals()[name](fuse=True, pretrained=True)
-        net.eval()
-        net(torch.randn(4, 3, 224, 224))
-        print(name,
-              net.FLOPS, 'FLOPs',
-              sum(p.numel() for p in net.parameters() if p.requires_grad), 'parameters')

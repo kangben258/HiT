@@ -1,10 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from lib.models.stark.backbone import FrozenBatchNorm2d
-from lib.models.stark.repvgg import RepVGGBlock
-# import time
-
+from lib.models.vt.backbone import FrozenBatchNorm2d
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1,
          freeze_bn=False):
@@ -399,127 +396,6 @@ class Corner_Predictor_Lite(nn.Module):
         else:
             return exp_x, exp_y
 
-
-class Corner_Predictor_Lite_Rep(nn.Module):
-    """ Corner Predictor module (Lite version with repvgg style)"""
-
-    def __init__(self, inplanes=64, channel=256, feat_sz=20, stride=16):
-        super(Corner_Predictor_Lite_Rep, self).__init__()
-        self.feat_sz = feat_sz
-        self.feat_len = feat_sz ** 2
-        self.stride = stride
-        self.img_sz = self.feat_sz * self.stride
-        '''convolution tower for two corners'''
-        self.conv_tower = nn.Sequential(RepVGGBlock(inplanes, channel, kernel_size=3, padding=1),
-                                        RepVGGBlock(channel, channel // 2, kernel_size=3, padding=1),
-                                        RepVGGBlock(channel // 2, channel // 4, kernel_size=3, padding=1),
-                                        RepVGGBlock(channel // 4, channel // 8, kernel_size=3, padding=1),
-                                        nn.Conv2d(channel // 8, 2, kernel_size=3, padding=1))
-
-        '''about coordinates and indexs'''
-        with torch.no_grad():
-            self.indice = (torch.arange(0, self.feat_sz).view(-1, 1) + 0.5) * self.stride  # here we can add a 0.5
-            # generate mesh-grid
-            self.coord_x = self.indice.repeat((self.feat_sz, 1)) \
-                .view((self.feat_sz * self.feat_sz,)).float().cuda()
-            self.coord_y = self.indice.repeat((1, self.feat_sz)) \
-                .view((self.feat_sz * self.feat_sz,)).float().cuda()
-
-    def forward(self, x, return_dist=False, softmax=True):
-        """ Forward pass with input x. """
-        # s = time.time()
-        score_map_tl, score_map_br = self.get_score_map(x)
-        # e1 = time.time()
-        # print("head forward time: %.2f ms" % ((e1-s)*1000))
-        if return_dist:
-            coorx_tl, coory_tl, prob_vec_tl = self.soft_argmax(score_map_tl, return_dist=True, softmax=softmax)
-            coorx_br, coory_br, prob_vec_br = self.soft_argmax(score_map_br, return_dist=True, softmax=softmax)
-            return torch.stack((coorx_tl, coory_tl, coorx_br, coory_br), dim=1) / self.img_sz, prob_vec_tl, prob_vec_br
-        else:
-            coorx_tl, coory_tl = self.soft_argmax(score_map_tl)
-            coorx_br, coory_br = self.soft_argmax(score_map_br)
-            # e2 = time.time()
-            # print("soft-argmax time: %.2f ms" % ((e2 - e1) * 1000))
-            return torch.stack((coorx_tl, coory_tl, coorx_br, coory_br), dim=1) / self.img_sz
-
-    def get_score_map(self, x):
-        score_map = self.conv_tower(x)  # (B,2,H,W)
-        return score_map[:, 0, :, :], score_map[:, 1, :, :]
-
-    def soft_argmax(self, score_map, return_dist=False, softmax=True):
-        """ get soft-argmax coordinate for a given heatmap """
-        score_vec = score_map.view((-1, self.feat_len))  # (batch, feat_sz * feat_sz)
-        prob_vec = nn.functional.softmax(score_vec, dim=1)
-        exp_x = torch.sum((self.coord_x * prob_vec), dim=1)
-        exp_y = torch.sum((self.coord_y * prob_vec), dim=1)
-        if return_dist:
-            if softmax:
-                return exp_x, exp_y, prob_vec
-            else:
-                return exp_x, exp_y, score_vec
-        else:
-            return exp_x, exp_y
-
-
-class Corner_Predictor_Lite_Rep_v2(nn.Module):
-    """ Corner Predictor module (Lite version with repvgg style)"""
-
-    def __init__(self, inplanes=128, channel=128, feat_sz=20, stride=16):
-        super(Corner_Predictor_Lite_Rep_v2, self).__init__()
-        self.feat_sz = feat_sz
-        self.feat_len = feat_sz ** 2
-        self.stride = stride
-        self.img_sz = self.feat_sz * self.stride
-        '''convolution tower for two corners'''
-        self.conv_tower = nn.Sequential(RepVGGBlock(inplanes, channel, kernel_size=3, padding=1),
-                                        RepVGGBlock(channel, channel, kernel_size=3, padding=1),
-                                        nn.Conv2d(channel, 2, kernel_size=3, padding=1))
-
-        '''about coordinates and indexs'''
-        with torch.no_grad():
-            self.indice = (torch.arange(0, self.feat_sz).view(-1, 1) + 0.5) * self.stride  # here we can add a 0.5
-            # generate mesh-grid
-            self.coord_x = self.indice.repeat((self.feat_sz, 1)) \
-                .view((self.feat_sz * self.feat_sz,)).float().cuda()
-            self.coord_y = self.indice.repeat((1, self.feat_sz)) \
-                .view((self.feat_sz * self.feat_sz,)).float().cuda()
-
-    def forward(self, x, return_dist=False, softmax=True):
-        """ Forward pass with input x. """
-        # s = time.time()
-        score_map_tl, score_map_br = self.get_score_map(x)
-        # e1 = time.time()
-        # print("head forward time: %.2f ms" % ((e1-s)*1000))
-        if return_dist:
-            coorx_tl, coory_tl, prob_vec_tl = self.soft_argmax(score_map_tl, return_dist=True, softmax=softmax)
-            coorx_br, coory_br, prob_vec_br = self.soft_argmax(score_map_br, return_dist=True, softmax=softmax)
-            return torch.stack((coorx_tl, coory_tl, coorx_br, coory_br), dim=1) / self.img_sz, prob_vec_tl, prob_vec_br
-        else:
-            coorx_tl, coory_tl = self.soft_argmax(score_map_tl)
-            coorx_br, coory_br = self.soft_argmax(score_map_br)
-            # e2 = time.time()
-            # print("soft-argmax time: %.2f ms" % ((e2 - e1) * 1000))
-            return torch.stack((coorx_tl, coory_tl, coorx_br, coory_br), dim=1) / self.img_sz
-
-    def get_score_map(self, x):
-        score_map = self.conv_tower(x)  # (B,2,H,W)
-        return score_map[:, 0, :, :], score_map[:, 1, :, :]
-
-    def soft_argmax(self, score_map, return_dist=False, softmax=True):
-        """ get soft-argmax coordinate for a given heatmap """
-        score_vec = score_map.view((-1, self.feat_len))  # (batch, feat_sz * feat_sz)
-        prob_vec = nn.functional.softmax(score_vec, dim=1)
-        exp_x = torch.sum((self.coord_x * prob_vec), dim=1)
-        exp_y = torch.sum((self.coord_y * prob_vec), dim=1)
-        if return_dist:
-            if softmax:
-                return exp_x, exp_y, prob_vec
-            else:
-                return exp_x, exp_y, score_vec
-        else:
-            return exp_x, exp_y
-
-
 class MLP(nn.Module):
     """ Very simple multi-layer perceptron (also called FFN)"""
 
@@ -547,7 +423,7 @@ def build_box_head(cfg):
         return mlp_head
     elif "CORNER" in cfg.MODEL.HEAD_TYPE:
         stride = cfg.MODEL.BACKBONE.STRIDE
-        if cfg.MODEL.NECK.TYPE in ["UPSAMPLE", "FPN","MAXF","MAXMINF","MAXMIDF","MINMIDF","MIDF","MINF"]:
+        if cfg.MODEL.NECK.TYPE in ["UPSAMPLE", "FB","MAXF","MAXMINF","MAXMIDF","MINMIDF","MIDF","MINF"]:
             stride = stride // (cfg.MODEL.NECK.NUM_LAYERS * cfg.MODEL.NECK.STRIDE)
         feat_sz = int(cfg.DATA.SEARCH.SIZE / stride)
         channel = getattr(cfg.MODEL, "HEAD_DIM", 256)
@@ -555,7 +431,6 @@ def build_box_head(cfg):
         if cfg.MODEL.HEAD_TYPE == "CORNER":
             corner_head = Corner_Predictor(inplanes=cfg.MODEL.HIDDEN_DIM, channel=channel,
                                            feat_sz=feat_sz, stride=stride)
-        ###############add by kb cornerhead without att##########################
         elif cfg.MODEL.HEAD_TYPE == "CORNER_WOATT":
             corner_head = Corner_Predictor_woatt(inplanes=cfg.MODEL.HIDDEN_DIM, channel=channel,
                                            feat_sz=feat_sz, stride=stride)
@@ -568,12 +443,6 @@ def build_box_head(cfg):
         elif cfg.MODEL.HEAD_TYPE == "CORNER_LITE":
             corner_head = Corner_Predictor_Lite(inplanes=cfg.MODEL.HIDDEN_DIM, channel=channel,
                                                 feat_sz=feat_sz, stride=stride)
-        elif cfg.MODEL.HEAD_TYPE == "CORNER_LITE_REP":
-            corner_head = Corner_Predictor_Lite_Rep(inplanes=cfg.MODEL.HIDDEN_DIM, channel=channel,
-                                                    feat_sz=feat_sz, stride=stride)
-        elif cfg.MODEL.HEAD_TYPE == "CORNER_LITE_REP_v2":
-            corner_head = Corner_Predictor_Lite_Rep_v2(inplanes=cfg.MODEL.HIDDEN_DIM, channel=channel,
-                                                       feat_sz=feat_sz, stride=stride)
         else:
             raise ValueError()
         return corner_head

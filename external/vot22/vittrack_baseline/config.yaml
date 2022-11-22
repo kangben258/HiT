@@ -1,7 +1,0 @@
-registry:
-- ./trackers.ini
-- ./trackers_1.ini
-- ./trackers_2.ini
-- ./trackers_3.ini
-- ./trackers_a.ini
-stack: vot2022/stb

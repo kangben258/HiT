@@ -2,8 +2,6 @@ import argparse
 import torch
 import _init_paths
 from lib.utils.merge import merge_template_search
-# from lib.config.stark_s.config import cfg, update_config_from_file
-# from lib.models.stark.stark_s import build_starks
 from thop import profile
 from thop.utils import clever_format
 import time
@@ -24,8 +22,7 @@ def parse_args():
     # for train
     parser.add_argument('--script', type=str, default='vt',
                         help='training script name')
-    # parser.add_argument('--config', type=str, default='v_b_16_256_bs16', help='yaml configure file name')
-    parser.add_argument('--config', type=str, default='lv_upsample_256_c384', help='yaml configure file name')
+    parser.add_argument('--config', type=str, default='HiT_Base', help='yaml configure file name')
     args = parser.parse_args()
 
     return args
