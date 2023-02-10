@@ -220,7 +220,7 @@ class Attention(torch.nn.Module):
         self.proj = torch.nn.Sequential(activation(), Linear_BN(
             self.dh, dim, bn_weight_init=0, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number))
         # different position encoding for ablation study <"ori_pos";"split";"cat_direct"> for choice
-        self.pos = "ori_pos"
+        self.pos = "no_crash"
         ###########################
         if self.pos != "ori_pos":
             if self.pos == "cat_direct":
@@ -237,6 +237,54 @@ class Attention(torch.nn.Module):
                 self.attention_biases_z = torch.nn.Parameter(
                     torch.zeros(num_heads,N_z,self.key_dim)
                 )
+            # use template as the center of search region
+            elif self.pos == "s_center":
+                begin_template = int((resolution_x-resolution_z)/2)
+                end_template = begin_template + resolution_z
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(range(begin_template, end_template),
+                                          range(begin_template,end_template)))
+                N_xz = len(points)
+                attention_offsets_xz = {}
+                idxs_xz = []
+                for p1 in points:
+                    for p2 in points:
+                        offset = (abs(p1[0] - p2[0]), abs(p1[1] - p2[1]))
+                        if offset not in attention_offsets_xz:
+                            attention_offsets_xz[offset] = len(attention_offsets_xz)
+                        idxs_xz.append(attention_offsets_xz[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets_xz)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs_xz).view(N_xz, N_xz))
+
+            ##### avoid the crash#######
+            elif self.pos == "no_crash":
+                t = resolution_x
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                for i in range(template_number):
+                    begin_template = int(2 * t - 1)
+                    end_template = begin_template + resolution_z
+                    points += list(
+                        itertools.product(range(begin_template , end_template),
+                                          range(begin_template,
+                                                end_template)))
+                    t = end_template
+                N_xz = len(points)
+                attention_offsets_xz = {}
+                idxs_xz = []
+                for p1 in points:
+                    for p2 in points:
+                        offset = (abs(p1[0] - p2[0]), abs(p1[1] - p2[1]))
+                        if offset not in attention_offsets_xz:
+                            attention_offsets_xz[offset] = len(attention_offsets_xz)
+                        idxs_xz.append(attention_offsets_xz[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets_xz)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs_xz).view(N_xz, N_xz))
         # dual-image position encoding
         else:
             points = list(itertools.product(range(resolution_x), range(resolution_x)))
@@ -281,7 +329,7 @@ class Attention(torch.nn.Module):
         k = k.permute(0, 2, 1, 3)
         v = v.permute(0, 2, 1, 3)
 
-        if self.pos == "ori_pos":
+        if self.pos == "ori_pos" or self.pos == "s_center" or self.pos == "no_crash":
             attn = (
                 (q @ k.transpose(-2, -1)) * self.scale
                 +
@@ -366,7 +414,7 @@ class AttentionSubsample(torch.nn.Module):
         self.resolution_x = resolution_x
         self.resolution_z = resolution_z
 
-        self.pos = "ori_pos"
+        self.pos = "no_crash"
         if self.pos != "ori_pos":
             if self.pos == "cat_direct":
                 N_xz = resolution_x ** 2 + (resolution_z ** 2) * template_number
@@ -388,6 +436,87 @@ class AttentionSubsample(torch.nn.Module):
                 self.attention_biases_z_q = torch.nn.Parameter(
                     torch.zeros(num_heads, int(N_z//4), self.key_dim)
                 )
+            elif self.pos == "s_center":
+                begin_template = int((resolution_x - resolution_z) / 2)
+                end_template = begin_template + resolution_z
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(
+                            range(begin_template, end_template),
+                            range(begin_template, end_template)))
+                begin_template_ = int((resolution_x_ - resolution_z_) / 2)
+                end_template_ = begin_template_ + resolution_z_
+                points_ = list(itertools.product(range(resolution_x_), range(resolution_x_)))
+                for i in range(template_number):
+                    points_ += list(
+                        itertools.product(
+                            range(begin_template_, end_template_),
+                            range(begin_template_, end_template_)))
+                N = len(points)
+                N_ = len(points_)
+                attention_offsets = {}
+                idxs = []
+                for p1 in points_:
+                    for p2 in points:
+                        size = 1
+                        offset = (
+                            abs(p1[0] * stride - p2[0] + (size - 1) / 2),
+                            abs(p1[1] * stride - p2[1] + (size - 1) / 2))
+                        if offset not in attention_offsets:
+                            attention_offsets[offset] = len(attention_offsets)
+                        idxs.append(attention_offsets[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs).view(N_, N))
+
+            elif self.pos == "no_crash":
+                t = resolution_x
+                t_ = resolution_x_
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                for i in range(template_number):
+                    begin_template = int(2 * t - 1)
+                    end_template = begin_template + resolution_z
+                    points += list(
+                        itertools.product(
+                            range(begin_template, end_template),
+                            range(begin_template, end_template)))
+                    t = end_template
+                points_ = list(itertools.product(range(resolution_x_), range(resolution_x_)))
+                num_search_point = len(points_)
+                for i in range(template_number):
+                    begin_template_ = int(2 * t_ - 1)
+                    end_template_ = begin_template_ + resolution_z_
+                    points_ += list(
+                        itertools.product(
+                            range(begin_template_, end_template_),
+                            range(begin_template_, end_template_)))
+                    t_ = end_template_
+                N = len(points)
+                N_ = len(points_)
+                attention_offsets = {}
+                idxs = []
+                for i,p1 in enumerate(points_):
+                    for p2 in points:
+                        size = 1
+                        if i+1 <= num_search_point:
+                            offset = (
+                                abs(p1[0] * stride - p2[0] + (size - 1) / 2),
+                                abs(p1[1] * stride - p2[1] + (size - 1) / 2))
+                        else:
+                            offset = (
+                                abs(((p1[0] + 1) * stride - 1) - p2[0] + (size - 1) / 2),
+                                abs(((p1[1] + 1) * stride - 1) - p2[1] + (size - 1) / 2))
+                        if offset not in attention_offsets:
+                            attention_offsets[offset] = len(attention_offsets)
+                        idxs.append(attention_offsets[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs).view(N_, N))
+
+
         else:
             points = list(itertools.product(range(resolution_x), range(resolution_x)))
             for i in range(template_number):
@@ -450,7 +579,7 @@ class AttentionSubsample(torch.nn.Module):
         q = self.q(x).view(B, -1, self.num_heads,
                            self.key_dim).permute(0, 2, 1, 3)
 
-        if self.pos == "ori_pos":
+        if self.pos == "ori_pos" or self.pos == "no_crash" or self.pos == "s_center":
             attn = (q @ k.transpose(-2, -1)) * self.scale + \
                    (self.attention_biases[:, self.attention_bias_idxs]
                     if self.training else self.ab)
