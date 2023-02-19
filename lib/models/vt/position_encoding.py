@@ -13,22 +13,22 @@ class PositionEmbeddingSine(nn.Module):
     This is a more standard version of the position embedding, very similar to the one
     used by the Attention is all you need paper, generalized to work on images.
     """
-    def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None):
+    def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None,shape=24):
         super().__init__()
-        self.num_pos_feats = num_pos_feats
+        self.num_pos_feats = num_pos_feats//2
         self.temperature = temperature
         self.normalize = normalize
+        self.shape = shape
         if scale is not None and normalize is False:
             raise ValueError("normalize should be True if scale is passed")
         if scale is None:
             scale = 2 * math.pi
         self.scale = scale
 
-    def forward(self, tensor_list: NestedTensor):
-        x = tensor_list.tensors
-        mask = tensor_list.mask
-        assert mask is not None
-        not_mask = ~mask # (b,h,w)
+    def forward(self, tensor):
+        x = tensor
+        b,_,_ = x.shape
+        not_mask = torch.ones([b,self.shape,self.shape]).to(x.device)
         y_embed = not_mask.cumsum(1, dtype=torch.float32)  # cumulative sum along axis 1 (h axis) --> (b, h, w)
         x_embed = not_mask.cumsum(2, dtype=torch.float32)  # cumulative sum along axis 2 (w axis) --> (b, h, w)
         if self.normalize:
@@ -43,7 +43,7 @@ class PositionEmbeddingSine(nn.Module):
         pos_y = y_embed[:, :, :, None] / dim_t # (b,h,w,d/2)
         pos_x = torch.stack((pos_x[:, :, :, 0::2].sin(), pos_x[:, :, :, 1::2].cos()), dim=4).flatten(3) # (b,h,w,d/2)
         pos_y = torch.stack((pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4).flatten(3) # (b,h,w,d/2)
-        pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)  # (b,h,w,d)
+        pos = torch.cat((pos_y, pos_x), dim=3)  # (b,h,w,d)
         return pos
 
 

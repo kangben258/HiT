@@ -12,6 +12,7 @@ import lib.models.vt.levit_utils as utils
 
 from timm.models.vision_transformer import trunc_normal_
 from timm.models.registry import register_model
+from lib.models.vt.position_encoding import PositionEmbeddingSine
 
 specification = {
     'LeViT_128S': {
@@ -216,11 +217,23 @@ class Attention(torch.nn.Module):
         self.dh = int(attn_ratio * key_dim) * num_heads
         self.attn_ratio = attn_ratio
         h = self.dh + nh_kd * 2
-        self.qkv = Linear_BN(dim, h, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
+        self.pos = "absolute_pos"
+        if self.pos == "absolute_pos":
+            # q, k, v = qkv.view(B, N, self.num_heads, -
+            # 1).split([self.key_dim, self.key_dim, self.d], dim=3)
+            self.dim =dim
+            self.resolution_x = resolution_x
+            self.resolution_z = resolution_z
+            self.q = Linear_BN(dim, self.nh_kd, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
+            self.k = Linear_BN(dim, self.nh_kd, resolution_x=resolution_x, resolution_z=resolution_z,
+                               template_number=template_number)
+            self.v = Linear_BN(dim, self.dh, resolution_x=resolution_x, resolution_z=resolution_z,
+                               template_number=template_number)
+        else:
+            self.qkv = Linear_BN(dim, h, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
         self.proj = torch.nn.Sequential(activation(), Linear_BN(
             self.dh, dim, bn_weight_init=0, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number))
         # different position encoding for ablation study <"ori_pos";"split";"cat_direct"> for choice
-        self.pos = "no_crash"
         ###########################
         if self.pos != "ori_pos":
             if self.pos == "cat_direct":
@@ -285,6 +298,86 @@ class Attention(torch.nn.Module):
                     torch.zeros(num_heads, len(attention_offsets_xz)))
                 self.register_buffer('attention_bias_idxs',
                                      torch.LongTensor(idxs_xz).view(N_xz, N_xz))
+
+            elif self.pos == "s&&t":
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                N_x = len(points)
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(range(resolution_x + resolution_z * i, resolution_x + resolution_z * (i + 1)),
+                                          range(resolution_x + resolution_z * i,
+                                                resolution_x + resolution_z * (i + 1))))
+                N_xz = len(points)
+                attention_offsets_xz = {}
+                idxs_xz = []
+                for i1,p1 in enumerate(points):
+                    for i2,p2 in enumerate(points):
+                        if (i1<N_x and i2>=N_x) or (i1>=N_x and i2<N_x):
+                            offset = (9999999,9999999)#S and T
+                        else:
+                            offset = (abs(p1[0] - p2[0]), abs(p1[1] - p2[1]))
+                        if offset not in attention_offsets_xz:
+                            attention_offsets_xz[offset] = len(attention_offsets_xz)
+                        idxs_xz.append(attention_offsets_xz[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets_xz)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs_xz).view(N_xz, N_xz))
+
+            elif self.pos == "s&&s_t&&t_s&&t":
+                door = resolution_z
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                N_x = len(points)
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(range(resolution_x + resolution_z * i, resolution_x + resolution_z * (i + 1)),
+                                          range(resolution_x + resolution_z * i,
+                                                resolution_x + resolution_z * (i + 1))))
+                N_xz = len(points)
+                attention_offsets_xz = {}
+                idxs_xz = []
+                for i1,p1 in enumerate(points):
+                    for i2,p2 in enumerate(points):
+                        if (i1<N_x and i2>=N_x) or (i1>=N_x and i2<N_x):
+                            offset = (9999999,9999999)#S and T
+                        else:
+                            offset = (abs(p1[0] - p2[0]), abs(p1[1] - p2[1]))
+                            if offset[0] + offset[1] > door:
+                                offset = (999999,999999)
+                        if offset not in attention_offsets_xz:
+                            attention_offsets_xz[offset] = len(attention_offsets_xz)
+                        idxs_xz.append(attention_offsets_xz[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets_xz)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs_xz).view(N_xz, N_xz))
+
+            elif self.pos == "s_t_line":
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(range(resolution_z),
+                                          range(resolution_x + resolution_z * i,
+                                                resolution_x + resolution_z * (i + 1))))
+                N_xz = len(points)
+                attention_offsets_xz = {}
+                idxs_xz = []
+                for p1 in points:
+                    for p2 in points:
+                        offset = (abs(p1[0] - p2[0]), abs(p1[1] - p2[1]))
+                        if offset not in attention_offsets_xz:
+                            attention_offsets_xz[offset] = len(attention_offsets_xz)
+                        idxs_xz.append(attention_offsets_xz[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets_xz)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs_xz).view(N_xz, N_xz))
+
+            elif self.pos == "absolute_pos":
+                resolution_all = resolution_z + resolution_x
+                self.pos_sin = PositionEmbeddingSine(num_pos_feats=self.dim,normalize=True,shape=resolution_all)
+
+
         # dual-image position encoding
         else:
             points = list(itertools.product(range(resolution_x), range(resolution_x)))
@@ -317,38 +410,51 @@ class Attention(torch.nn.Module):
         if mode and hasattr(self, 'ab'):
             del self.ab
         else:
-            if self.pos == "ori_pos":
+            if self.pos == "ori_pos" or self.pos == "s_center" or self.pos == "no_crash" or self.pos == "s&&t" or self.pos =="s&&s_t&&t_s&&t" or self.pos == "s_t_line":
                 self.ab = self.attention_biases[:, self.attention_bias_idxs]
 
     def forward(self, x):  # x (B,N,C)
-        B, N, C = x.shape
-        qkv = self.qkv(x)
-        q, k, v = qkv.view(B, N, self.num_heads, -
-                           1).split([self.key_dim, self.key_dim, self.d], dim=3)
-        q = q.permute(0, 2, 1, 3)
-        k = k.permute(0, 2, 1, 3)
-        v = v.permute(0, 2, 1, 3)
-
-        if self.pos == "ori_pos" or self.pos == "s_center" or self.pos == "no_crash":
+        if self.pos == "absolute_pos":
+            _,N,_ = x.shape
+            pos =self.pos_sin(x)
+            B,_,_,C = pos.shape
+            pos_x = pos[:,:self.resolution_x,:self.resolution_x,:].contiguous().view(B,-1,C)
+            pos_z = pos[:,self.resolution_x:,self.resolution_x:,:].contiguous().view(B,-1,C)
+            pos = torch.cat((pos_x,pos_z),dim=1)
+            q = self.q(x+pos).view(B, N, self.num_heads, -1).permute(0, 2, 1, 3)
+            k = self.k(x + pos).view(B, N, self.num_heads, -1).permute(0, 2, 1, 3)
+            v = self.v(x).view(B, N, self.num_heads, -1).permute(0, 2, 1, 3)
             attn = (
-                (q @ k.transpose(-2, -1)) * self.scale
-                +
-                (self.attention_biases[:, self.attention_bias_idxs]
-                 if self.training else self.ab)
+                    (q @ k.transpose(-2, -1)) * self.scale
             )
-        elif self.pos == "split":
-            pos = torch.cat((self.attention_biases_x,self.attention_biases_z),dim=1)
-            q = q + pos
-            k = k + pos
-            attn =(
-                (q @ k.transpose(-2, -1)) * self.scale
-            )
-        elif self.pos == "cat_direct":
-            attn = (
-                (q @ k.transpose(-2, -1)) * self.scale
-                +
-                self.attention_biases
-            )
+        else:
+            B, N, C = x.shape
+            qkv = self.qkv(x)
+            q, k, v = qkv.view(B, N, self.num_heads, -
+                               1).split([self.key_dim, self.key_dim, self.d], dim=3)
+            q = q.permute(0, 2, 1, 3)#b,head,n,c
+            k = k.permute(0, 2, 1, 3)
+            v = v.permute(0, 2, 1, 3)
+            if self.pos == "ori_pos" or self.pos == "s_center" or self.pos == "no_crash" or self.pos == "s&&t" or self.pos =="s&&s_t&&t_s&&t" or self.pos == "s_t_line":
+                attn = (
+                    (q @ k.transpose(-2, -1)) * self.scale
+                    +
+                    (self.attention_biases[:, self.attention_bias_idxs]
+                     if self.training else self.ab)
+                )
+            elif self.pos == "split":
+                pos = torch.cat((self.attention_biases_x,self.attention_biases_z),dim=1)
+                q = q + pos
+                k = k + pos
+                attn =(
+                    (q @ k.transpose(-2, -1)) * self.scale
+                )
+            elif self.pos == "cat_direct":
+                attn = (
+                    (q @ k.transpose(-2, -1)) * self.scale
+                    +
+                    self.attention_biases
+                )
         attn = attn.softmax(dim=-1)
         x = (attn @ v).transpose(1, 2).reshape(B, N, self.dh)
         x = self.proj(x)
@@ -403,10 +509,24 @@ class AttentionSubsample(torch.nn.Module):
         self.resolution_x_2 = resolution_x_**2
         self.resolution_z_2 = resolution_z_**2
         h = self.dh + nh_kd
-        self.kv = Linear_BN(in_dim, h, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
-        self.q = torch.nn.Sequential(
-            Subsample(stride, resolution_x, resolution_z, template_number),
-            Linear_BN(in_dim, nh_kd, resolution_x=resolution_x_, resolution_z=resolution_z_, template_number=template_number))
+        self.pos = "absolute_pos"
+        if self.pos == "absolute_pos":
+            # k, v = self.kv(x).view(B, N, self.num_heads, -
+            # 1).split([self.key_dim, self.d], dim=3)
+            self.in_dim = in_dim
+            self.resolution_x = resolution_x
+            self.resolution_z = resolution_z
+            self.q = torch.nn.Sequential(
+                Subsample(stride, resolution_x, resolution_z, template_number),
+                Linear_BN(in_dim, nh_kd, resolution_x=resolution_x_, resolution_z=resolution_z_,
+                          template_number=template_number))
+            self.k = Linear_BN(in_dim, self.nh_kd, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
+            self.v = Linear_BN(in_dim, self.dh, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
+        else:
+            self.kv = Linear_BN(in_dim, h, resolution_x=resolution_x, resolution_z=resolution_z, template_number=template_number)
+            self.q = torch.nn.Sequential(
+                Subsample(stride, resolution_x, resolution_z, template_number),
+                Linear_BN(in_dim, nh_kd, resolution_x=resolution_x_, resolution_z=resolution_z_, template_number=template_number))
         self.proj = torch.nn.Sequential(activation(), Linear_BN(
             self.dh, out_dim, resolution_x=resolution_x_, resolution_z=resolution_z_, template_number=template_number))
 
@@ -414,7 +534,6 @@ class AttentionSubsample(torch.nn.Module):
         self.resolution_x = resolution_x
         self.resolution_z = resolution_z
 
-        self.pos = "no_crash"
         if self.pos != "ori_pos":
             if self.pos == "cat_direct":
                 N_xz = resolution_x ** 2 + (resolution_z ** 2) * template_number
@@ -515,6 +634,116 @@ class AttentionSubsample(torch.nn.Module):
                     torch.zeros(num_heads, len(attention_offsets)))
                 self.register_buffer('attention_bias_idxs',
                                      torch.LongTensor(idxs).view(N_, N))
+            elif self.pos == "s&&t":
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                N_x = len(points)
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(
+                            range(resolution_x + resolution_z * i, resolution_x + resolution_z * (i + 1)),
+                            range(resolution_x + resolution_z * i, resolution_x + resolution_z * (i + 1))))
+                points_ = list(itertools.product(range(resolution_x_), range(resolution_x_)))
+                N_x_ = len(points_)
+                for i in range(template_number):
+                    points_ += list(
+                        itertools.product(
+                            range(resolution_x_ + resolution_z_ * i, resolution_x_ + resolution_z_ * (i + 1)),
+                            range(resolution_x_ + resolution_z_ * i, resolution_x_ + resolution_z_ * (i + 1))))
+                N = len(points)
+                N_ = len(points_)
+                attention_offsets = {}
+                idxs = []
+                for i1,p1 in enumerate(points_):
+                    for i2,p2 in enumerate(points):
+                        size = 1
+                        if (i1<N_x_ and i2>=N_x) or (i1>=N_x_ and i2<N_x):
+                            offset = (99999999,99999999)
+                        else:
+                            offset = (
+                                abs(p1[0] * stride - p2[0] + (size - 1) / 2),
+                                abs(p1[1] * stride - p2[1] + (size - 1) / 2))
+                        if offset not in attention_offsets:
+                            attention_offsets[offset] = len(attention_offsets)
+                        idxs.append(attention_offsets[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs).view(N_, N))
+
+            elif self.pos == "s&&s_t&&t_s&&t":
+                door = resolution_z
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                N_x = len(points)
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(
+                            range(resolution_x + resolution_z * i, resolution_x + resolution_z * (i + 1)),
+                            range(resolution_x + resolution_z * i, resolution_x + resolution_z * (i + 1))))
+                points_ = list(itertools.product(range(resolution_x_), range(resolution_x_)))
+                N_x_ = len(points_)
+                for i in range(template_number):
+                    points_ += list(
+                        itertools.product(
+                            range(resolution_x_ + resolution_z_ * i, resolution_x_ + resolution_z_ * (i + 1)),
+                            range(resolution_x_ + resolution_z_ * i, resolution_x_ + resolution_z_ * (i + 1))))
+                N = len(points)
+                N_ = len(points_)
+                attention_offsets = {}
+                idxs = []
+                for i1,p1 in enumerate(points_):
+                    for i2,p2 in enumerate(points):
+                        size = 1
+                        if (i1<N_x_ and i2>=N_x) or (i1>=N_x_ and i2<N_x):
+                            offset = (99999999,99999999)
+                        else:
+                            offset = (
+                                abs(p1[0] * stride - p2[0] + (size - 1) / 2),
+                                abs(p1[1] * stride - p2[1] + (size - 1) / 2))
+                            if offset[0] + offset[1] > door:
+                                offset = (9999999,9999999)
+                        if offset not in attention_offsets:
+                            attention_offsets[offset] = len(attention_offsets)
+                        idxs.append(attention_offsets[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs).view(N_, N))
+
+            elif self.pos == "s_t_line":
+                points = list(itertools.product(range(resolution_x), range(resolution_x)))
+                for i in range(template_number):
+                    points += list(
+                        itertools.product(
+                            range(resolution_z),
+                            range(resolution_x + resolution_z * i, resolution_x + resolution_z * (i + 1))))
+                points_ = list(itertools.product(range(resolution_x_), range(resolution_x_)))
+                for i in range(template_number):
+                    points_ += list(
+                        itertools.product(
+                            range(resolution_z_),
+                            range(resolution_x_ + resolution_z_ * i, resolution_x_ + resolution_z_ * (i + 1))))
+                N = len(points)
+                N_ = len(points_)
+                attention_offsets = {}
+                idxs = []
+                for p1 in points_:
+                    for p2 in points:
+                        size = 1
+                        offset = (
+                            abs(p1[0] * stride - p2[0] + (size - 1) / 2),
+                            abs(p1[1] * stride - p2[1] + (size - 1) / 2))
+                        if offset not in attention_offsets:
+                            attention_offsets[offset] = len(attention_offsets)
+                        idxs.append(attention_offsets[offset])
+                self.attention_biases = torch.nn.Parameter(
+                    torch.zeros(num_heads, len(attention_offsets)))
+                self.register_buffer('attention_bias_idxs',
+                                     torch.LongTensor(idxs).view(N_, N))
+
+            elif self.pos == "absolute_pos":
+                resolution_all = resolution_z + resolution_x
+                self.pos_sin = PositionEmbeddingSine(num_pos_feats=self.in_dim,normalize=True,shape=resolution_all)
+
 
 
         else:
@@ -567,32 +796,46 @@ class AttentionSubsample(torch.nn.Module):
         if mode and hasattr(self, 'ab'):
             del self.ab
         else:
-            if self.pos == "ori_pos":
+            if self.pos == "ori_pos" or self.pos == "s_center" or self.pos == "no_crash" or self.pos == "s&&t" or self.pos == "s&&s_t&&t_s&&t" or self.pos == "s_t_line":
                 self.ab = self.attention_biases[:, self.attention_bias_idxs]
 
-    def forward(self, x):
-        B, N, C = x.shape
-        k, v = self.kv(x).view(B, N, self.num_heads, -
-                               1).split([self.key_dim, self.d], dim=3)
-        k = k.permute(0, 2, 1, 3)  # BHNC
-        v = v.permute(0, 2, 1, 3)  # BHNC
-        q = self.q(x).view(B, -1, self.num_heads,
-                           self.key_dim).permute(0, 2, 1, 3)
-
-        if self.pos == "ori_pos" or self.pos == "no_crash" or self.pos == "s_center":
-            attn = (q @ k.transpose(-2, -1)) * self.scale + \
-                   (self.attention_biases[:, self.attention_bias_idxs]
-                    if self.training else self.ab)
-        elif self.pos == "split":
-            pos_k = torch.cat((self.attention_biases_x_k,self.attention_biases_z_k),dim=1)
-            k = k + pos_k
-            pos_q = torch.cat((self.attention_biases_x_q,self.attention_biases_z_q),dim=1)
-            q = q + pos_q
-            attn = ((q @ k.transpose(-2, -1)) * self.scale)
-        elif self.pos == "cat_direct":
+    def forward(self, x):#B,N,C
+        if self.pos == "absolute_pos":
+            _, N, _ = x.shape
+            pos = self.pos_sin(x)
+            B, _, _, C = pos.shape
+            pos_x = pos[:, :self.resolution_x, :self.resolution_x, :].contiguous().view(B, -1, C)
+            pos_z = pos[:, self.resolution_x:, self.resolution_x:, :].contiguous().view(B, -1, C)
+            pos = torch.cat((pos_x, pos_z), dim=1)
+            q = self.q(x + pos).view(B, -1, self.num_heads, self.key_dim).permute(0, 2, 1, 3)
+            k = self.k(x + pos).view(B, N, self.num_heads, -1).permute(0, 2, 1, 3)
+            v = self.v(x).view(B, N, self.num_heads, -1).permute(0, 2, 1, 3)
             attn = (
-                    (q @ k.transpose(-2, -1)) * self.scale + \
-                self.attention_biases)
+                    (q @ k.transpose(-2, -1)) * self.scale
+            )
+        else:
+            B, N, C = x.shape
+            k, v = self.kv(x).view(B, N, self.num_heads, -
+                                   1).split([self.key_dim, self.d], dim=3)
+            k = k.permute(0, 2, 1, 3)  # BHNC
+            v = v.permute(0, 2, 1, 3)  # BHNC
+            q = self.q(x).view(B, -1, self.num_heads,
+                               self.key_dim).permute(0, 2, 1, 3)
+
+            if self.pos == "ori_pos" or self.pos == "no_crash" or self.pos == "s_center" or self.pos == "s&&t" or self.pos == "s&&s_t&&t_s&&t" or self.pos == "s_t_line":
+                attn = (q @ k.transpose(-2, -1)) * self.scale + \
+                       (self.attention_biases[:, self.attention_bias_idxs]
+                        if self.training else self.ab)
+            elif self.pos == "split":
+                pos_k = torch.cat((self.attention_biases_x_k,self.attention_biases_z_k),dim=1)
+                k = k + pos_k
+                pos_q = torch.cat((self.attention_biases_x_q,self.attention_biases_z_q),dim=1)
+                q = q + pos_q
+                attn = ((q @ k.transpose(-2, -1)) * self.scale)
+            elif self.pos == "cat_direct":
+                attn = (
+                        (q @ k.transpose(-2, -1)) * self.scale + \
+                    self.attention_biases)
         attn = attn.softmax(dim=-1)
 
         x = (attn @ v).transpose(1, 2).reshape(B, -1, self.dh)
