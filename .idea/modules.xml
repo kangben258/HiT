@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/EdgeTrack-main.iml" filepath="$PROJECT_DIR$/.idea/EdgeTrack-main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/HiT.iml" filepath="$PROJECT_DIR$/.idea/HiT.iml" />
     </modules>
   </component>
 </project>

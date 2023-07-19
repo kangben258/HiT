@@ -2,6 +2,11 @@ import argparse
 import torch
 import _init_paths
 from lib.utils.box_ops import box_xyxy_to_cxcywh
+import os
+import sys
+prj_path = os.path.join(os.path.dirname(__file__), '..')
+if prj_path not in sys.path:
+    sys.path.append(prj_path)
 import torch.nn as nn
 import torch.nn.functional as F
 # for onnx conversion and inference
@@ -12,13 +17,13 @@ import onnxruntime
 import time
 import os
 from lib.test.evaluation.environment import env_settings
-import lib.models.vt.levit_utils as utils
+import lib.models.HiT.levit_utils as utils
 import importlib
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Parse args for training')
-    parser.add_argument('--script', type=str, default='vt', help='script name')
+    parser.add_argument('--script', type=str, default='HiT', help='script name')
     parser.add_argument('--config', type=str, default='HiT_Base', help='yaml configure file name')
     args = parser.parse_args()
     return args
@@ -80,14 +85,14 @@ if __name__ == "__main__":
     load_checkpoint = False
     # update cfg
     args = parse_args()
-    yaml_fname = 'experiments/%s/%s.yaml' % (args.script, args.config)
+    yaml_fname = prj_path + '/experiments/%s/%s.yaml' % (args.script, args.config)
     config_module = importlib.import_module('lib.config.%s.config' % args.script)
     cfg = config_module.cfg
     config_module.update_config_from_file(yaml_fname)
-    save_name = "checkpoints/train/%s/%s/VT_cpu_ep%04d.onnx" % (args.script, args.config, cfg.TEST.EPOCH)
+    save_name = prj_path + "/checkpoints/train/%s/%s/VT_cpu_ep%04d.onnx" % (args.script, args.config, cfg.TEST.EPOCH)
     # build the model
-    model_module = importlib.import_module('lib.models.vt')
-    model_constructor = model_module.build_vt
+    model_module = importlib.import_module('lib.models.HiT')
+    model_constructor = model_module.build_hit
     model = model_constructor(cfg)
     # load checkpoint
     if load_checkpoint:

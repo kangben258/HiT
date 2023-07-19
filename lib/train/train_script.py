@@ -10,15 +10,15 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 # some more advanced functions
 from .base_functions import *
 # network related
-from lib.models.vt import build_vt
+from lib.models.HiT import build_hit
 # forward propagation related
-from lib.train.actors import VTActor
+from lib.train.actors import HiTActor
 # for import modules
 import importlib
 
 
 def run(settings):
-    settings.description = 'Training script for STARK-S, STARK-ST stage1, and STARK-ST stage2'
+    settings.description = 'Training script for HiT'
 
     # update the default configs with config file
     if not os.path.exists(settings.cfg_file):
@@ -56,8 +56,8 @@ def run(settings):
         cfg.ckpt_dir = settings.save_dir
 
     # Create network
-    if settings.script_name == "vt":
-        net = build_vt(cfg)
+    if settings.script_name == "HiT":
+        net = build_hit(cfg)
     else:
         raise ValueError("illegal script name")
 
@@ -72,10 +72,10 @@ def run(settings):
     settings.distill = getattr(cfg.TRAIN, "DISTILL", False)
     settings.distill_loss_type = getattr(cfg.TRAIN, "DISTILL_LOSS_TYPE", "KL")
     # Loss functions and Actors
-    if settings.script_name == "vt":
+    if settings.script_name == "HiT":
         objective = {'giou': giou_loss, 'l1': l1_loss}
         loss_weight = {'giou': cfg.TRAIN.GIOU_WEIGHT, 'l1': cfg.TRAIN.L1_WEIGHT}
-        actor = VTActor(net=net, objective=objective, loss_weight=loss_weight, settings=settings)
+        actor = HiTActor(net=net, objective=objective, loss_weight=loss_weight, settings=settings)
     else:
         raise ValueError("illegal script name")
 
@@ -85,8 +85,4 @@ def run(settings):
     trainer = LTRTrainer(actor, [loader_train, loader_val], optimizer, settings, lr_scheduler, use_amp=use_amp)
 
     # train process
-    if settings.script_name in ["stark_st2", "stark_st2_plus_sp"]:
-        #chenxin
-        trainer.train(cfg.TRAIN.EPOCH, load_latest=True, fail_safe=True, load_previous_ckpt=True)
-    else:
-        trainer.train(cfg.TRAIN.EPOCH, load_latest=True, fail_safe=True)
+    trainer.train(cfg.TRAIN.EPOCH, load_latest=True, fail_safe=True)

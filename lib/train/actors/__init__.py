@@ -1,2 +1,2 @@
 from .base_actor import BaseActor
-from .vt import VTActor
+from .HiT import HiTActor
