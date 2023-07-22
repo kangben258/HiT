@@ -23,7 +23,7 @@ HiT achieves promising speed with competitive performance, it is faster and perf
 
 |                                           | HiT-Base | HiT-Small | HiT-Tiny | FEAR | TransT |
 | :---------------------------------------- | :------: | :-------: | :------: | :--: | :----: |
-| LaSOT (AUC)                               | **64.6** | **60.4**  | **54.7** | 53.5 |  64.9  |
+| LaSOT (AUC)                               | **64.6** | **60.5**  | **54.8** | 53.5 |  64.9  |
 | GOT-10K (AO)                              | **64.0** | **62.6**  | **52.6** | 61.9 |  72.3  |
 | TrackingNet (AUC)                         | **80.0** | **77.7**  | **74.6** |  -   |  81.4  |
 | PyTorch Speed on 3090 GPU (FPS)           | **175**  |  **192**  | **204**  | 105  |   63   |
