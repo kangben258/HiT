@@ -50,7 +50,6 @@
    ## Data Preparation
    
    Put the tracking datasets in ./data. It should look like:
-   
       ```
    ${STARK_ROOT}
     -- data
@@ -72,6 +71,7 @@
             ...
             |-- TRAIN_11
             |-- TEST
+  
       ```
    
    ## Set project paths
