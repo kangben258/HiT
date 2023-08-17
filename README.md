@@ -13,13 +13,13 @@
    
    The architecture of HiT is very simple only contains three components: a lightweight hierarchical vision transformer, a bridge Module and a prediction head.
    
-   ![HiT_Framework](/home/kb/kb/HiT/tracking/Framework.png)
+   ![HiT_Framework](/tracking/Framework.png)
    
    ### Strong performance
    
    HiT achieves promising speed with competitive performance, it is faster and performs better than previous efficient trackers, It significantly closes the gap between efficient trackers and mainstream trackers. It can be deployed in low-computing power scenarios.
    
-   ![HiT_Framework](/home/kb/kb/HiT/tracking/compare.png)
+   ![HiT_Framework](/tracking/compare.png)
    
    |                                           | HiT-Base | HiT-Small | HiT-Tiny | FEAR | TransT |
    | :---------------------------------------- | :------: | :-------: | :------: | :--: | :----: |
