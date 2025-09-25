@@ -191,56 +191,56 @@ python lib/train/run_training.py --script DyHiT --config stage2 --save_dir .
 
 
 
-  ## Accelerating the Base Tracker
+## Accelerating the Base Tracker
 
 We demonstrate how to use DyHiT to accelerate OSTrack (**DyOSTrack**). You can refer to this approach to accelerate other base trackers as well.
 
 - First, you need to download the OSTrack weights and the DyHiT weights, and modify the **WEIGHT** path in [experiments/DyOSTrack/dyostrack.yaml](experiments/DyOSTrack/dyostrack.yaml) to point to the locations of these two weights.
 - You can adjust the **THRESHOLD** parameter in [experiments/DyOSTrack/dyostrack.yaml](experiments/DyOSTrack/dyostrack.yaml) to achieve different speed–accuracy trade-offs.
 
-   ```
-   python tracking/test.py DyOSTrack dyostrack --dataset <dataset_name> --threads 2 --num_gpus 2 --debug 0
-   ```
+```
+python tracking/test.py DyOSTrack dyostrack --dataset <dataset_name> --threads 2 --num_gpus 2 --debug 0
+```
 
 
 
-   ## Run Video demo
+## Run Video demo
 
-   ```
-   python tracking/video_demo.py <path of onnx model> <video path> 
-   ```
-
-   
-
-   ## Transform onnx; test speed, flops, params
-
-   ```
-   python tracking/transfer_onnx
-   python tracking/profile_model_hit --script HiT --config HiT_Base
-   python tracking/profile_model_hit_cpu --script HiT --config HiT_Base 
-   python tracking/profile_model_hit_onnx --script HiT --config HiT_Base
-   python tracking/profile_model_hit_onnx_cpu --script HiT --config HiT_Base
-   python tracking/profile_model_dyhit_route1.py # test speed for dyhit only use route1
-   ```
+```
+python tracking/video_demo.py <path of onnx model> <video path> 
+```
 
    
 
-   ## Models && Raw results
+## Transform onnx; test speed, flops, params
 
-   The trained models, and the raw tracking results are provided in [here](https://drive.google.com/drive/folders/15VTIJnUtJTdU6TcmGOixSEcErYV-h_xL?usp=sharing)
+```
+python tracking/transfer_onnx
+python tracking/profile_model_hit --script HiT --config HiT_Base
+python tracking/profile_model_hit_cpu --script HiT --config HiT_Base 
+python tracking/profile_model_hit_onnx --script HiT --config HiT_Base
+python tracking/profile_model_hit_onnx_cpu --script HiT --config HiT_Base
+python tracking/profile_model_dyhit_route1.py # test speed for dyhit only use route1
+```
 
    
 
-   ## Acknowledgement
+## Models && Raw results
 
-   * This codebase is implemented on [STARK](https://github.com/researchmm/Stark) and [PyTracking](https://github.com/visionml/pytracking).We would like to thank their authors for providing great libraries.
-   
-     
+The trained models, and the raw tracking results are provided in [here](https://drive.google.com/drive/folders/15VTIJnUtJTdU6TcmGOixSEcErYV-h_xL?usp=sharing)
 
-   ## Contact
 
-   * Ben Kang (email:kangben@mail.dlut.edu.cn)
-   
-   * Xin Chen (email:chenxin3131@mail.dlut.edu.cn)
-   
-     Feel free to contact if you have additional questions.
+
+## Acknowledgement
+
+* This codebase is implemented on [STARK](https://github.com/researchmm/Stark) and [PyTracking](https://github.com/visionml/pytracking).We would like to thank their authors for providing great libraries.
+
+  
+
+## Contact
+
+* Ben Kang (email:kangben@mail.dlut.edu.cn)
+
+* Xin Chen (email:chenxin3131@mail.dlut.edu.cn)
+
+  Feel free to contact if you have additional questions.
