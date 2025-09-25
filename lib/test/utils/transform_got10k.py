@@ -25,8 +25,8 @@ def transform_got10k(tracker_name, cfg_name):
                 os.makedirs(seq_dir)
             new_item = item.replace(".txt", '_001.txt')
             dest_path = os.path.join(seq_dir, new_item)
-            bbox_arr = np.loadtxt(src_path, dtype=np.int, delimiter='\t')
-            np.savetxt(dest_path, bbox_arr, fmt='%d', delimiter=',')
+            bbox_arr = np.loadtxt(src_path, dtype=np.float_, delimiter='\t')
+            np.savetxt(dest_path, bbox_arr, fmt='%.9f', delimiter=',')
         else:
             seq_name = item.replace("_time.txt", '')
             seq_dir = os.path.join(dest_dir, seq_name)

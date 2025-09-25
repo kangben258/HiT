@@ -24,8 +24,8 @@ def _save_tracker_output(seq: Sequence, tracker: Tracker, output: dict):
         base_results_path = os.path.join(tracker.results_dir, seq.name)
 
     def save_bb(file, data):
-        tracked_bb = np.array(data).astype(int)
-        np.savetxt(file, tracked_bb, delimiter='\t', fmt='%d')
+        tracked_bb = np.array(data).astype(float)
+        np.savetxt(file, tracked_bb, delimiter='\t', fmt='%.9f')
 
     def save_time(file, data):
         exec_times = np.array(data).astype(float)

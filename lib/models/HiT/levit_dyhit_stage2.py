@@ -5,7 +5,7 @@
 # https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
 # Copyright 2020 Ross Wightman, Apache-2.0 License
 from collections import OrderedDict
-
+from torch.nn import functional as F
 import torch
 import itertools
 import lib.models.HiT.levit_utils as utils
@@ -27,9 +27,24 @@ specification = {
     'LeViT_256': {
         'C': '256_384_512', 'D': 32, 'N': '4_6_8', 'X': '4_4_4', 'drop_path': 0,
         'weights': 'https://dl.fbaipublicfiles.com/LeViT/LeViT-256-13b5763e.pth'},
-    'LeViT_384': {
+    'DyHiT_384': {
         'C': '384_512_768', 'D': 32, 'N': '6_9_12', 'X': '4_4_4', 'drop_path': 0.1,
         'weights': 'https://dl.fbaipublicfiles.com/LeViT/LeViT-384-9bdaf2e2.pth'},
+    'LeViT_384_layer4': {
+        'C': '384', 'D': 32, 'N': '6', 'X': '4', 'drop_path': 0.1,
+        'weights': 'https://dl.fbaipublicfiles.com/LeViT/LeViT-384-9bdaf2e2.pth'},
+    'LeViT_256_layer4': {
+        'C': '256', 'D': 32, 'N': '4', 'X': '4', 'drop_path': 0,
+        'weights': 'https://dl.fbaipublicfiles.com/LeViT/LeViT-256-13b5763e.pth'},
+    'LeViT_192_layer4': {
+        'C': '192', 'D': 32, 'N': '3', 'X': '4', 'drop_path': 0,
+        'weights': 'https://dl.fbaipublicfiles.com/LeViT/LeViT-192-92712e41.pth'},
+    'LeViT_128_layer4': {
+        'C': '128', 'D': 16, 'N': '4', 'X': '4', 'drop_path': 0,
+        'weights': 'https://dl.fbaipublicfiles.com/LeViT/LeViT-128-b88c2750.pth'},
+    'LeViT_128S_layer4': {
+        'C': '128', 'D': 16, 'N': '4', 'X': '2', 'drop_path': 0,
+        'weights': 'https://dl.fbaipublicfiles.com/LeViT/LeViT-128S-96703c44.pth'},
 }
 
 __all__ = [specification.keys()]
@@ -39,6 +54,15 @@ def LeViT_128S(num_classes=1000, distillation=True,
               pretrained=False, fuse=False,
               search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
     return model_factory(**specification['LeViT_128S'], num_classes=num_classes,
+                         distillation=distillation, pretrained=pretrained, fuse=fuse,
+                         search_size=search_size, template_size=template_size, template_number=template_number,
+                         neck_type=neck_type)
+
+@register_model
+def LeViT_128S_layer4(num_classes=1000, distillation=True,
+              pretrained=False, fuse=False,
+              search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
+    return model_factory(**specification['LeViT_128S_layer4'], num_classes=num_classes,
                          distillation=distillation, pretrained=pretrained, fuse=fuse,
                          search_size=search_size, template_size=template_size, template_number=template_number,
                          neck_type=neck_type)
@@ -53,12 +77,30 @@ def LeViT_128(num_classes=1000, distillation=True,
                          search_size=search_size, template_size=template_size, template_number=template_number,
                          neck_type=neck_type)
 
+@register_model
+def LeViT_128_layer4(num_classes=1000, distillation=True,
+              pretrained=False, fuse=False,
+              search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
+    return model_factory(**specification['LeViT_128_layer4'], num_classes=num_classes,
+                         distillation=distillation, pretrained=pretrained, fuse=fuse,
+                         search_size=search_size, template_size=template_size, template_number=template_number,
+                         neck_type=neck_type)
+
 
 @register_model
 def LeViT_192(num_classes=1000, distillation=True,
               pretrained=False, fuse=False,
               search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
     return model_factory(**specification['LeViT_192'], num_classes=num_classes,
+                         distillation=distillation, pretrained=pretrained, fuse=fuse,
+                         search_size=search_size, template_size=template_size, template_number=template_number,
+                         neck_type=neck_type)
+
+@register_model
+def LeViT_192_layer4(num_classes=1000, distillation=True,
+              pretrained=False, fuse=False,
+              search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
+    return model_factory(**specification['LeViT_192_layer4'], num_classes=num_classes,
                          distillation=distillation, pretrained=pretrained, fuse=fuse,
                          search_size=search_size, template_size=template_size, template_number=template_number,
                          neck_type=neck_type)
@@ -73,18 +115,50 @@ def LeViT_256(num_classes=1000, distillation=True,
                          search_size=search_size, template_size=template_size, template_number=template_number,
                          neck_type=neck_type)
 
-
 @register_model
-def LeViT_384(num_classes=1000, distillation=True,
+def LeViT_256_layer4(num_classes=1000, distillation=True,
               pretrained=False, fuse=False,
               search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
-    return model_factory(**specification['LeViT_384'], num_classes=num_classes,
+    return model_factory(**specification['LeViT_256_layer4'], num_classes=num_classes,
                          distillation=distillation, pretrained=pretrained, fuse=fuse,
                          search_size=search_size, template_size=template_size, template_number=template_number,
                          neck_type=neck_type)
 
+
+@register_model
+def DyHiT_384_stage2_256tokens(num_classes=1000, distillation=True,
+              pretrained=False, fuse=False,
+              search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
+    return model_factory(**specification['DyHiT_384'], num_classes=num_classes,
+                         distillation=distillation, pretrained=pretrained, fuse=fuse,
+                         search_size=search_size, template_size=template_size, template_number=template_number,
+                         neck_type=neck_type)
+
+@register_model
+def LeViT_384_layer4(num_classes=1000, distillation=True,
+              pretrained=False, fuse=False,
+              search_size=224, template_size=112, template_number=1, neck_type='LINEAR'):
+    return model_factory(**specification['LeViT_384_layer4'], num_classes=num_classes,
+                         distillation=distillation, pretrained=pretrained, fuse=fuse,
+                         search_size=search_size, template_size=template_size, template_number=template_number,
+                         neck_type=neck_type)
 FLOPS_COUNTER = 0
 
+
+
+class MLP(torch.nn.Module):
+    """ Very simple multi-layer perceptron (also called FFN)"""
+
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+        super().__init__()
+        self.num_layers = num_layers
+        h = [hidden_dim] * (num_layers - 1)
+        self.layers = torch.nn.ModuleList(torch.nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        return x
 
 class Conv2d_BN(torch.nn.Sequential):
     def __init__(self, a, b, ks=1, stride=1, pad=0, dilation=1,
@@ -989,15 +1063,9 @@ class LeViT(torch.nn.Module):
                                 resolution_z=resolution_z),
                         ), drop_path))
         self.blocks = torch.nn.Sequential(*self.blocks)
+        self.router = MLP(embed_dim[0],embed_dim[0]//4,1,3)
         self.num_patches_search = resolution_x ** 2
         self.num_patches_template = resolution_z ** 2
-
-        # Classifier head
-        self.head = BN_Linear(
-            embed_dim[-1], num_classes) if num_classes > 0 else torch.nn.Identity()
-        if distillation:
-            self.head_dist = BN_Linear(
-                embed_dim[-1], num_classes) if num_classes > 0 else torch.nn.Identity()
         if self.neck_type == 'FB' or self.neck_type == 'MAXF' or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
             fb_idx = []
             for i in range(len(self.blocks)):
@@ -1021,23 +1089,67 @@ class LeViT(torch.nn.Module):
                 xz = x
             else:
                 xz = torch.cat((xz, x), dim=1)
+        xz = self.blocks[0:self.fb_idx[0]](xz)
+        cls = xz.mean(1).unsqueeze(1)
+        cxz = torch.cat((cls, xz), dim=1)
+        difct_score = self.router(xz[:, :256, :]).sigmoid()
+        out_list = []
+        out_list.append(cxz)
+        out_list.append(difct_score)  # size:[bs,256,384]
+        return out_list
+    def forward_test(self,images_list,first_score,threshold,frame,score_t):
+        out_list = []
+        for i in range(len(images_list)):
+            x = images_list[i]
+            x = self.patch_embed(x)
+            x = x.flatten(2).transpose(1, 2)
+            if i == 0:
+                xz = x
+            else:
+                xz = torch.cat((xz, x), dim=1)
         if self.neck_type == 'FB' or self.neck_type == "MAXF" or self.neck_type == "MAXMINF" or self.neck_type == "MAXMIDF" or self.neck_type == "MINMIDF" or self.neck_type == 'MIDF':
             assert len(self.fb_idx) == 2
             xz1 = self.blocks[0:self.fb_idx[0]](xz)
-            xz2 = self.blocks[self.fb_idx[0]:self.fb_idx[1]](xz1)
-            xz = self.blocks[self.fb_idx[1]:](xz2)
-            out_list = [xz1, xz2]
-        else:
-            xz = self.blocks(xz) #[bs, 20, 768]
-            out_list = []
+            if frame:#开启评估
+                difct_score = self.router(xz1[:, :256, :]).sigmoid()
+                select_element = difct_score[difct_score > score_t]
+                score = torch.mean(select_element).item()
+            else:
+                score = first_score
 
-        cls = xz.mean(1).unsqueeze(1) #[bs, 1, 768]
-        cxz = torch.cat((cls, xz), dim=1)
-        out_list.append(cxz)
+            import numpy as np
+            if np.isnan(score):
+                score = 0.01
+            #第一帧默认使用小的追踪器
+            if first_score is None:
+                cls = xz1.mean(1).unsqueeze(1)
+                cxz = torch.cat((cls, xz1), dim=1)
+                out_list.append(cxz)
+                out_list.append(score)
+            else:
+                # 大于阈值认为当前场景简单小的追踪器足以应对
+                if score > threshold:
+                    cls = xz1.mean(1).unsqueeze(1)
+                    cxz = torch.cat((cls, xz1), dim=1)
+                    out_list.append(cxz)
+                    out_list.append(score)
+                else:
+                    xz2 = self.blocks[self.fb_idx[0]:self.fb_idx[1]](xz1)
+                    xz = self.blocks[self.fb_idx[1]:](xz2)
+                    out_list = [xz1, xz2]
+                    cls = xz.mean(1).unsqueeze(1)  # [bs, 1, 768]
+                    cxz = torch.cat((cls, xz), dim=1)
+                    out_list.append(cxz)
+                    out_list.append(score)
+        else:
+            raise ValueError()
         return out_list
 
-    def forward(self, images_list,**kwargs):
-        out_list = self.forward_features(images_list)
+    def forward(self, images_list,first_score=None,threshold=0,frame=True,score_t=0.6):
+        if self.training:
+            out_list = self.forward_features(images_list)
+        else:
+            out_list = self.forward_test(images_list,first_score,threshold,frame,score_t=score_t)
         return out_list
 
 
@@ -1049,19 +1161,23 @@ def model_factory(C, D, X, N, drop_path, weights,
     num_heads = [int(x) for x in N.split('_')]
     depth = [int(x) for x in X.split('_')]
     act = torch.nn.Hardswish
+    num_stage = len(embed_dim)
+    down_ops = []
+    for i in range(num_stage):
+        if i == num_stage - 1:
+            break
+        else:
+            a = ['Subsample', D, embed_dim[i] // D, 4, 2, 2]
+            down_ops.append(a)
     model = LeViT(
         patch_size=16,
         embed_dim=embed_dim,
         num_heads=num_heads,
-        key_dim=[D] * 3,
+        key_dim=[D] * num_stage,
         depth=depth,
-        attn_ratio=[2, 2, 2],
-        mlp_ratio=[2, 2, 2],
-        down_ops=[
-            #('Subsample',key_dim, num_heads, attn_ratio, mlp_ratio, stride)
-            ['Subsample', D, embed_dim[0] // D, 4, 2, 2],
-            ['Subsample', D, embed_dim[1] // D, 4, 2, 2],
-        ],
+        attn_ratio=[2] * num_stage,
+        mlp_ratio=[2] * num_stage,
+        down_ops=down_ops,
         attention_activation=act,
         mlp_activation=act,
         hybrid_backbone=b16(embed_dim[0], activation=act),
@@ -1074,8 +1190,8 @@ def model_factory(C, D, X, N, drop_path, weights,
         neck_type=neck_type
     )
     # modify pretrained for debug by chenxin
-    if pretrained:
-        load_pretrained(model, weights)
+    # if pretrained:
+    #     load_pretrained(model, weights)
 
     if fuse:
         # merge conv+bn to one operator, should be False when Training and be True when Evaluate for accelerate
@@ -1093,6 +1209,6 @@ def load_pretrained(model, weights):
                 state_dict_load[key] = state_dict[key]
             else:
                 state_dict_load[key] = model.state_dict()[key]
-    model.load_state_dict(state_dict_load,strict=False)
+    model.load_state_dict(state_dict_load,strict=True)
 
 

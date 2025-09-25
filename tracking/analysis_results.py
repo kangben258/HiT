@@ -6,12 +6,12 @@ from lib.test.analysis.plot_results import plot_results, print_results, print_pe
 from lib.test.evaluation import get_dataset, trackerlist
 
 trackers = []
-dataset_name = 'lasot_extension_subset'
+dataset_name = 'lasot'
 """vittrack"""
 # trackers.extend(trackerlist(name='vittrack_baseline', parameter_name='vit_l_16_256_bs16', dataset_name=dataset_name,
 #                             run_ids=None, display_name='vittrack_baseline'))
-trackers.extend(trackerlist(name='vt', parameter_name='HiT_Base', dataset_name=dataset_name,
-                            run_ids=None, display_name='HiT_Base'))
+trackers.extend(trackerlist(name='DyOSTrack', parameter_name='dyostrack', dataset_name=dataset_name,
+                            run_ids=None, display_name='stage2'))
 """pytracking"""
 # trackers.extend(trackerlist('atom', 'default', None, range(0,5), 'ATOM'))
 # trackers.extend(trackerlist('dimp', 'dimp18', None, range(0,5), 'DiMP18'))

@@ -7,6 +7,8 @@ from torch import nn
 from lib.utils.misc import is_main_process
 from lib.models.HiT import levit as levit_module
 from lib.models.HiT import pvt as pvt_module
+from lib.models.HiT import levit_dyhit,levit_dytracker
+from lib.models.HiT import levit_dyhit_stage2 as levit_dyhit_s2
 import os
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -69,8 +71,9 @@ class BackboneBase(nn.Module):
         self.body = backbone
         self.num_channels = num_channels
 
-    def forward(self, images_list):
-        xs = self.body(images_list)
+    def forward(self, images_list,first_score,threshold,frame=True,score_t=0.6):
+        xs = self.body(images_list=images_list, first_score=first_score,
+                       threshold=threshold, frame=frame, score_t=score_t)
         return xs
 
 
@@ -89,7 +92,7 @@ class Backbone(BackboneBase):
                  neck_type: str,
                  open_layers: list,
                  ckpt_path=None):
-        if "vit" in name.lower():
+        if "it" in name.lower():
             # todo: frozenlayernorm
             if "pvit" in name:
                 backbone = getattr(pvt_module,name)(
@@ -101,30 +104,68 @@ class Backbone(BackboneBase):
                 net_type = "pvit"
 
             if "LeViT" in name:
-                # fuse == False when training
-                backbone = getattr(levit_module, name)(
-                    num_classes=0,
-                    distillation=False,
-                    pretrained=is_main_process(),
-                    fuse = False,
-                    search_size=search_size,
-                    template_size=template_size,
-                    template_number=template_number,
-                    neck_type=neck_type
-                )
-                if "LeViT_128S" in name:
+                if 'dytracker' in name:
+                    backbone = getattr(levit_dytracker, name)(
+                        num_classes=0,
+                        distillation=False,
+                        pretrained=is_main_process(),
+                        fuse=False,
+                        search_size=search_size,
+                        template_size=template_size,
+                        template_number=template_number,
+                        neck_type=neck_type
+                    )
                     num_channels = 384
-                elif "LeViT_128" in name:
-                    num_channels = 384
-                elif "LeViT_192" in name:
-                    num_channels = 384
-                elif "LeViT_256" in name:
-                    num_channels = 512
-                elif "LeViT_384" in name:
-                    num_channels = 768
                 else:
-                    num_channels = 768
+                    # fuse == False when training
+                    backbone = getattr(levit_module, name)(
+                        num_classes=0,
+                        distillation=False,
+                        pretrained=is_main_process(),
+                        fuse = False,
+                        search_size=search_size,
+                        template_size=template_size,
+                        template_number=template_number,
+                        neck_type=neck_type
+                    )
+                    if "LeViT_128S" in name:
+                        num_channels = 384
+                    elif "LeViT_128" in name:
+                        num_channels = 384
+                    elif "LeViT_192" in name:
+                        num_channels = 384
+                    elif "LeViT_256" in name:
+                        num_channels = 512
+                    elif "LeViT_384" in name:
+                        num_channels = 768
+                    else:
+                        num_channels = 768
                 net_type = "levit"
+            if "DyHiT" in name:
+                if "stage" in name:
+                    backbone = getattr(levit_dyhit_s2, name)(
+                        num_classes=0,
+                        distillation=False,
+                        pretrained=is_main_process(),
+                        fuse=False,
+                        search_size=search_size,
+                        template_size=template_size,
+                        template_number=template_number,
+                        neck_type=neck_type
+                    )
+                else:
+                    backbone = getattr(levit_dyhit, name)(
+                        num_classes=0,
+                        distillation=False,
+                        pretrained=is_main_process(),
+                        fuse=False,
+                        search_size=search_size,
+                        template_size=template_size,
+                        template_number=template_number,
+                        neck_type=neck_type
+                    )
+                num_channels = 768
+                net_type = "DyHiT"
         else:
             raise ValueError()
         super().__init__(backbone, train_backbone, open_layers, num_channels, return_interm_layers, net_type=net_type)

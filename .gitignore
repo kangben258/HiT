@@ -1,0 +1,9 @@
+# Python 编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+lib/train/logs
+checkpoints/*
+
+.idea/workspace.xml

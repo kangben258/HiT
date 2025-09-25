@@ -10,9 +10,9 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 # some more advanced functions
 from .base_functions import *
 # network related
-from lib.models.HiT import build_hit
+from lib.models.HiT import build_hit,build_dyhit
 # forward propagation related
-from lib.train.actors import HiTActor
+from lib.train.actors import HiTActor,DyHiTActor,DyHiTActor_stage2
 # for import modules
 import importlib
 
@@ -58,6 +58,8 @@ def run(settings):
     # Create network
     if settings.script_name == "HiT":
         net = build_hit(cfg)
+    elif settings.script_name == "DyHiT":
+        net = build_dyhit(cfg)
     else:
         raise ValueError("illegal script name")
 
@@ -76,6 +78,17 @@ def run(settings):
         objective = {'giou': giou_loss, 'l1': l1_loss}
         loss_weight = {'giou': cfg.TRAIN.GIOU_WEIGHT, 'l1': cfg.TRAIN.L1_WEIGHT}
         actor = HiTActor(net=net, objective=objective, loss_weight=loss_weight, settings=settings)
+    elif settings.script_name == "DyHiT":
+        if cfg.TRAIN.STAGE == 1:
+            objective = {'giou': giou_loss, 'l1': l1_loss}
+            loss_weight = {'giou': cfg.TRAIN.GIOU_WEIGHT, 'l1': cfg.TRAIN.L1_WEIGHT}
+            actor = DyHiTActor(net=net, objective=objective, loss_weight=loss_weight, settings=settings)
+        elif cfg.TRAIN.STAGE == 2:
+            objective = {'giou_1': giou_loss, 'l1_1': l1_loss, 'giou_2': giou_loss, 'l1_2': l1_loss}
+            loss_weight = {'giou_1': cfg.TRAIN.GIOU_WEIGHT, 'l1_1': cfg.TRAIN.L1_WEIGHT,
+                           'giou_2': cfg.TRAIN.GIOU_WEIGHT, 'l1_2': cfg.TRAIN.L1_WEIGHT}
+            actor = DyHiTActor_stage2(net=net, objective=objective, loss_weight=loss_weight,
+                                                      settings=settings)
     else:
         raise ValueError("illegal script name")
 

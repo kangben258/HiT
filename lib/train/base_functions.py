@@ -254,6 +254,15 @@ def get_optimizer_scheduler(net, cfg):
                 p.requires_grad = False
             else:
                 print(n)
+    elif 'DyHiT' in cfg.MODEL.BACKBONE.TYPE:
+        param_dicts = [
+            {"params": [p for n, p in net.named_parameters() if p.requires_grad]},
+        ]
+        if is_main_process():
+            print("Learnable parameters are shown below.")
+            for n, p in net.named_parameters():
+                if p.requires_grad:
+                    print(n)
     else:
         param_dicts = [
             {"params": [p for n, p in net.named_parameters() if "backbone" not in n and p.requires_grad]},

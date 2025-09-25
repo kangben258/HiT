@@ -2,8 +2,7 @@ import os
 
 import numpy as np
 from lib.test.evaluation.data import Sequence, BaseDataset, SequenceList
-from lib.test.utils.load_text import load_text, load_str
-
+from lib.test.utils.load_text import load_text
 ############
 # current 00000492.png of test_015_Sord_video_Q01_done is damaged and replaced by a copy of 00000491.png
 ############
@@ -28,7 +27,7 @@ class TNL2kDataset(BaseDataset):
         ground_truth_rect = load_text(str(anno_path), delimiter=',', dtype=np.float64)
 
         text_dsp_path = '{}/{}/language.txt'.format(self.base_path, sequence_name)
-        text_dsp = load_str(text_dsp_path)
+        # text_dsp = load_str(text_dsp_path)
 
         frames_path = '{}/{}/imgs'.format(self.base_path, sequence_name)
         frames_list = [f for f in os.listdir(frames_path)]
